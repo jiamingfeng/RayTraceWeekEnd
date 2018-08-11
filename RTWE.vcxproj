@@ -122,11 +122,17 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="hitable.cpp" />
     <ClCompile Include="main.cpp" />
+    <ClCompile Include="Material.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="camera.h" />
     <ClInclude Include="hitable.h" />
+    <ClInclude Include="material.h" />
+    <ClInclude Include="random.h" />
     <ClInclude Include="ray.h" />
+    <ClInclude Include="renderContext.h" />
     <ClInclude Include="Sphere.h" />
     <ClInclude Include="stb_image_write.h" />
     <ClInclude Include="vec3.h" />

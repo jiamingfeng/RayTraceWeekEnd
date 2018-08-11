@@ -6,7 +6,7 @@ class Sphere :
 {
 public:
 	Sphere() = delete;
-	Sphere(const Vec3& Center, float Radius) : center(Center), radius(Radius) {}
+	Sphere(const Vec3& Center, float Radius, Material* newMat) : center(Center), radius(Radius), Hitable(newMat) {}
 	~Sphere() = default;
 
 	virtual bool hit(const Ray& r, float tMin, float tMax, HitRecord& rec) const override;
@@ -24,6 +24,7 @@ bool Sphere::IsHitPointValid(float hitPoint, float tMin, float tMax, HitRecord &
 		rec.t = hitPoint;
 		rec.p = r.PointOnRay(hitPoint);
 		rec.normal = (rec.p - center) / radius;
+		rec.mat = mat;
 		return true;
 	}
 	return false;
@@ -49,4 +50,6 @@ bool Sphere::hit(const Ray& r, float tMin, float tMax, HitRecord& rec) const
 			return IsHitPointValid(farHitPoint,  tMin, tMax, rec, r);
 		}
 	}
+
+	return false;
 }

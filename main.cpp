@@ -3,11 +3,17 @@
 
 
 // geometries
-#include "hitable.h"
+#include "material.h"
 #include "sphere.h"
+#include "camera.h"
+#include "renderContext.h"
 
+//std cout
 #include <iostream>
 
+#include <cmath>
+
+// max float
 #include <limits>
 
 // time
@@ -20,6 +26,7 @@ using std::chrono::milliseconds;
 
 static const bool USE_PNG = true;
 //const bool parallelism_enabled = true;
+static const unsigned int MAX_TRACE_DEPTH = 50;
 
 
 // C++ 17 parallel
@@ -39,31 +46,6 @@ namespace fs = std::filesystem;
 void PPM_HEADER(int width, int height)
 {
 	std::cout << "P3\n" << width << " " << height << "\n255\n";
-}
-
-	
-Vec3 RenderColor(const Ray& r, const Hitable *world)
-{
-	HitRecord recHit;
-	Vec3 result(0.f, 0.f, 0.f);
-
-	float maxDistance = std::numeric_limits<float>::max();
-	if ( world->hit(r, 0.f, maxDistance, recHit))
-	{
-		//result = Vec3(1.f, 0.f, 0.f);
-		auto &normal = recHit.normal;
-
-		// map normal from [-1, 1] to [0, 1]
-		//normal += 1.0f;
-		result = 0.5f * (normal + 1.0f);
-	}		
-	else
-	{
-		float t = 0.5f * (unit_vector(r.Direction()).y() + 1.0f);
-		result = (1.0f - t) * Vec3(1.0f, 1.0f, 1.0f) + t * Vec3(0.5f, 0.7f, 1.0f);  // 0~ 1
-	}
-
-	return result * 255.f;  // 0 ~ 255
 }
 
 /*
@@ -118,10 +100,36 @@ bool DoesArgumentExist(int argc, char** argv, const std::string& option)
 }
 
 
+static Vec3 RenderColor(const Ray& r, const Hitable *world, unsigned int TraceDepth)
+{
+	HitRecord recHit;
+	Vec3 result(0.f, 0.f, 0.f);
+
+	float maxDistance = std::numeric_limits<float>::max();
+	if (world->hit(r, 0.0001f, maxDistance, recHit))
+	{
+		Ray scatted;
+		Vec3 attenuation;
+		if (TraceDepth < MAX_TRACE_DEPTH && recHit.mat->Scatter(r, recHit, attenuation, scatted))
+		{
+			result = attenuation * RenderColor(scatted, world, TraceDepth+1);
+		}		
+	}
+	else
+	{
+		float t = 0.5f * (unit_vector(r.Direction()).y() + 1.0f);
+		result = (1.0f - t) * Vec3(1.0f, 1.0f, 1.0f) + t * Vec3(0.5f, 0.7f, 1.0f);  // 0~ 1
+	}
+
+	return result;// * 255.f;  // 0 ~ 255
+}
+
+
 int main(int argc, char** argv)
 {
 	int WIDTH = 1920;
 	int HEIGHT = 1080;
+	int SAMPLE_COUNT = 128;
 	if (DoesArgumentExist(argc, argv, "-w"))
 	{
 		WIDTH = std::atoi(getArugmentOption(argc, argv, "-w").c_str());
@@ -132,21 +140,36 @@ int main(int argc, char** argv)
 		HEIGHT = std::atoi(getArugmentOption(argc, argv, "-h").c_str());
 	}
 
+	if (DoesArgumentExist(argc, argv, "-s"))
+	{
+		SAMPLE_COUNT = std::atoi(getArugmentOption(argc, argv, "-s").c_str());
+	}
 
-	static const Vec3 origin(0.f, 0.f, 0.f);
+
 	const float VIEW_WIDTH = 4.0f;
 	const float VIEW_HEIGHT = float(HEIGHT) / float(WIDTH) * VIEW_WIDTH;
-	static const Vec3 lowerLeftCorner(-VIEW_WIDTH/2.f, -VIEW_HEIGHT/2.f, -VIEW_HEIGHT / 2.f);
-	static const Vec3 horizontal(VIEW_WIDTH, 0.0f, 0.0f);	
-	static const Vec3 vertical(0.0f, VIEW_HEIGHT, 0.0f);
+
+	Camera camera;
+	RenderContext context;
+
 
 	// define world
 	HitableList* world = new HitableList();
-	Sphere small(Vec3(0.f, 0.2f, -1.0f), 0.4f);
-	Sphere large(Vec3(0.f, -100.f, -5.f), 100.f);
+	world->list.resize(4);
+	Lambert mat1(Vec3(0.8f, 0.3f, 0.3f), context);
+	Lambert mat2(Vec3(0.8f, 0.8f, 0.0f), context);
+	Lambert mat3(Vec3(0.8f, 0.6f, 0.2f), context);
+	Lambert mat4(Vec3(0.8f, 0.8f, 0.8f), context);
+
+	Sphere s1(Vec3(0.f, 0.2f, -1.0f), 0.4f, &mat1);
+	Sphere s2(Vec3(0.f, -100.f, -5.f), 100.f, &mat2);
+	Sphere s3(Vec3(1.f, 0.f, -1.f), 0.5f, &mat3);
+	Sphere s4(Vec3(-1.f, 0.f, -1.f), 0.5f, &mat4);
 	
-	world->list.push_back(&small);
-	world->list.push_back(&large);
+	world->list[0] = &s1;
+	world->list[1] = &s2;
+	world->list[2] = &s3;
+	world->list[3] = &s4;
 	
 
 	time_point<Clock> start, end;
@@ -165,8 +188,8 @@ int main(int argc, char** argv)
 	start = Clock::now();
 
 	// generate an increased sequence of integers
-	std::vector<int> heights(HEIGHT);	
-	std::generate(heights.begin(), heights.end(), [&]() { static int hi = 0; return hi++; });
+	//std::vector<int> heights(HEIGHT);	
+	//std::generate(heights.begin(), heights.end(), [&]() { static int hi = 0; return hi++; });
 
 	//std::vector<int> widths(WIDTH);
 	//std::generate(widths.begin(), widths.end(), [&]() { static int wi = 0; return wi++; });
@@ -187,15 +210,30 @@ int main(int argc, char** argv)
 		//	std::end(widths),
 		//	[&imagebuffer, i](int j) 
 		//#pragma omp parallel for
+
 		for (int j = 0; j < WIDTH; ++j)
 		{
-			float u = float(j) / float(WIDTH);
-			float v = float(HEIGHT - 1 - i) / float(HEIGHT);
+			// uniform distributed floating point values
 
-			Ray r(origin, lowerLeftCorner + u * horizontal + v * vertical);
+			Vec3 finalColor(0, 0, 0);
+			// iterator through all samples per pixel
+			for (int s = 0; s < SAMPLE_COUNT; ++s)
+			{
+				float u = float(j + context.rand.rSample()) / float(WIDTH);
+				float v = float(HEIGHT - 1 - i + context.rand.rSample()) / float(HEIGHT);
+
+				Ray r(camera.CreateRay(u, v));
+
+				finalColor += RenderColor(r, world, 0);
+			}
+
+			finalColor = finalColor / float(SAMPLE_COUNT);
+			finalColor = Vec3(pow(finalColor[0], 0.5f), pow(finalColor[1], 0.5f), pow(finalColor[2], 0.5f));
+			IntVec3 rgb(finalColor  * 255.f );
+
 			if constexpr(USE_PNG)
 			{
-				IntVec3 rgb(RenderColor(r, world));
+				
 				imageBuffer[3 * (i*WIDTH + j) + 0] = rgb.R();
 				imageBuffer[3 * (i*WIDTH + j) + 1] = rgb.G();
 				imageBuffer[3 * (i*WIDTH + j) + 2] = rgb.B();
@@ -203,7 +241,7 @@ int main(int argc, char** argv)
 			else
 			{
 				//#pragma omp ordered
-				std::cout << IntVec3(RenderColor(r, world)) << std::endl;
+				std::cout << rgb << std::endl;
 			}
 
 		}
@@ -221,10 +259,10 @@ int main(int argc, char** argv)
 	int result = 0;
 	if constexpr(USE_PNG)
 	{		
-	fs::path filePath = fs::current_path();
-	filePath /= "renderTest.png";
-	stbi_write_png(filePath.string().c_str(), WIDTH, HEIGHT, 3, imageBuffer, 3 * WIDTH);
-	delete[] imageBuffer;
+		fs::path filePath = fs::current_path();
+		filePath /= "renderTest.png";
+		stbi_write_png(filePath.string().c_str(), WIDTH, HEIGHT, 3, imageBuffer, 3 * WIDTH);
+		delete[] imageBuffer;
 	}
 	end = Clock::now();
 
@@ -232,3 +270,6 @@ int main(int argc, char** argv)
 	std::cout << "Png write time: " << diff.count() << "ms" << std::endl;
 	return getchar();
 }
+
+
+
