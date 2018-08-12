@@ -124,6 +124,44 @@ static Vec3 RenderColor(const Ray& r, const Hitable *world, unsigned int TraceDe
 	return result;// * 255.f;  // 0 ~ 255
 }
 
+HitableList *random_scene(RenderContext & context) {
+	int n = 500;
+	HitableList *world = new HitableList();
+	world->list.reserve(500);
+	world->list.push_back(new Sphere(Vec3(0, -1000.f, 0), 1000.f, new Lambert(Vec3(0.5f, 0.5f, 0.5f), context)));
+	int i = 1;
+	for (int a = -11; a < 11; a++) {
+		for (int b = -11; b < 11; b++) {
+			float choose_mat = context.rand.rSample();
+			Vec3 center(float(a) + 0.9f*context.rand.rSample(), 0.2f, float(b) + 0.9f*context.rand.rSample());
+			if ((center - Vec3(4.f, 0.2f, 0)).length() > 0.9f) {
+				if (choose_mat < 0.8f) {  // diffuse
+					world->list.push_back (new Sphere(center, 0.2f, new Lambert(
+						Vec3(context.rand.rSample()*context.rand.rSample(), 
+						context.rand.rSample()*context.rand.rSample(), 
+						context.rand.rSample()*context.rand.rSample()), context)));
+				}
+				else if (choose_mat < 0.95f) { // metal
+					world->list.push_back(new Sphere(center, 0.2f,
+						new Metal(Vec3(0.5f*(1.f + context.rand.rSample()), 
+							0.5f*(1.f + context.rand.rSample()), 
+							0.5f*(1.f + context.rand.rSample())), 
+							0.5f*context.rand.rSample(), context)));
+				}
+				else {  // glass
+					world->list.push_back(new Sphere(center, 0.2f, new Dielectric(1.5f, context)));
+				}
+			}
+		}
+	}
+
+	world->list.push_back(new Sphere(Vec3(0, 1.f, 0), 1.f, new Dielectric(1.5f, context)));
+	world->list.push_back(new Sphere(Vec3(-4.f, 1.f, 0), 1.0f, new Lambert(Vec3(0.4f, 0.2f, 0.1f), context)));
+	world->list.push_back(new Sphere(Vec3(4.f, 1.f, 0), 1.0f, new Metal(Vec3(0.7f, 0.6f, 0.5f), 0.0, context)));
+
+	return world;
+}
+
 
 int main(int argc, char** argv)
 {
@@ -145,32 +183,51 @@ int main(int argc, char** argv)
 		SAMPLE_COUNT = std::atoi(getArugmentOption(argc, argv, "-s").c_str());
 	}
 
+	RenderContext context;
 
 	const float VIEW_WIDTH = 4.0f;
 	const float VIEW_HEIGHT = float(HEIGHT) / float(WIDTH) * VIEW_WIDTH;
+	//Vec3 lookFrom(3.f, 3.f, 2.f);
+	//Vec3 lookAt(0, 0, -1.f);
+	//float distToFocus = (lookFrom - lookAt).length();
+	//float aperture = 0.5f;
 
-	Camera camera;
-	RenderContext context;
+	Vec3 lookFrom(13.f, 2.f, 3.f);
+	Vec3 lookAt(0, 0, 0);
+	float distToFocus = 10.0f;
+	float aperture = 0.1f;
+
+	Camera camera(lookFrom, lookAt, Vec3(0, 1, 0),
+		          20.f, float(WIDTH) / float(HEIGHT),
+		          aperture, distToFocus, context);
+	
 
 
 	// define world
-	HitableList* world = new HitableList();
-	world->list.resize(4);
-	Lambert mat1(Vec3(0.8f, 0.3f, 0.3f), context);
-	Lambert mat2(Vec3(0.8f, 0.8f, 0.0f), context);
-	Lambert mat3(Vec3(0.8f, 0.6f, 0.2f), context);
-	Lambert mat4(Vec3(0.8f, 0.8f, 0.8f), context);
+	//HitableList* world = new HitableList();
+	//world->list.resize(4);
+	//Lambert mat1(Vec3(0.1f, 0.2f, 0.5f), context);
+	//Lambert mat2(Vec3(0.8f, 0.8f, 0.0f), context);
+	//Metal mat3(Vec3(0.8f, 0.6f, 0.2f), 0.2f, context);
+	////Metal mat4(Vec3(0.8f, 0.8f, 0.8f), 0.8f, context);
+	//Dielectric glass(1.5f, context);
 
-	Sphere s1(Vec3(0.f, 0.2f, -1.0f), 0.4f, &mat1);
-	Sphere s2(Vec3(0.f, -100.f, -5.f), 100.f, &mat2);
-	Sphere s3(Vec3(1.f, 0.f, -1.f), 0.5f, &mat3);
-	Sphere s4(Vec3(-1.f, 0.f, -1.f), 0.5f, &mat4);
-	
-	world->list[0] = &s1;
-	world->list[1] = &s2;
-	world->list[2] = &s3;
-	world->list[3] = &s4;
-	
+	//Sphere s0(Vec3(0.f, 0.2f, -1.0f), 0.5f, &mat1);
+	//Sphere s1(Vec3(0.f, -100.5f, -5.f), 100.f, &mat2);
+	//Sphere s2(Vec3(1.f, 0.f, -1.f), 0.5f, &mat3);
+	//Sphere s3(Vec3(-1.f, 0.f, -1.f), 0.5f, &glass);
+	//Sphere s4(Vec3(-1.f, 0.f, -1.f), -0.48f, &glass);
+	//
+	//world->list[0] = &s0;
+	//world->list[1] = &s1;
+	//world->list[2] = &s2;
+	//world->list[3] = &s3;
+	//world->list[4] = &s4;
+
+	HitableList* world = random_scene(context);
+
+
+
 
 	time_point<Clock> start, end;
 

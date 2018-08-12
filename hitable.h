@@ -22,6 +22,7 @@ struct HitRecord
 class Hitable {
 public:
 	Hitable(Material* newMat = nullptr) : mat(newMat) {}
+	virtual ~Hitable();
 	virtual bool hit(const Ray& r, float tMin, float tMax, HitRecord& rec) const = 0;
 
 protected: 
@@ -31,7 +32,7 @@ protected:
 class HitableList : public Hitable {
 public:
 	HitableList(Material* newMat=nullptr) : Hitable(newMat) {};
-	~HitableList() = default;
+	~HitableList();
 
 	virtual bool hit(const Ray& r, float tMin, float tMax, HitRecord& rec) const override;
 

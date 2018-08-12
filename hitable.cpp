@@ -1,4 +1,10 @@
 #include "hitable.h"
+#include "material.h"
+
+Hitable::~Hitable()
+{ 
+	delete mat; 
+}
 
 bool HitableList::hit(const Ray& r, float tMin, float tMax, HitRecord& rec) const 
 {
@@ -20,4 +26,12 @@ bool HitableList::hit(const Ray& r, float tMin, float tMax, HitRecord& rec) cons
 	});
 
 	return hitAnygthing;
+}
+
+HitableList::~HitableList()
+{
+	std::for_each(list.begin(), list.end(), [](Hitable* h)
+	{
+		delete h;
+	});
 }
