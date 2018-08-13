@@ -57,7 +57,14 @@ bool HitableList::bbox(float t0, float t1, AABB& box) const
 	}
 
 	AABB eachBBox;
-	auto iter = std::find_if_not(list.begin(), list.end(), [t0, t1, &eachBBox, &box](Hitable* h)-> bool {
+	bool result = list[0]->bbox(t0, t1, eachBBox);
+	if (!result)
+	{
+		return false;
+	}
+
+	box = eachBBox;
+	auto iter = std::find_if_not(list.begin(), list.end(), [t0, t1, &eachBBox, &box](Hitable* h) {
 		bool hasBBox = h->bbox(t0, t1, eachBBox);
 		box = Hitable::MergeBBoxes(box, eachBBox);
 		return hasBBox;

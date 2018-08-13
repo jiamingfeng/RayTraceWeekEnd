@@ -1,7 +1,61 @@
 #include "bvh.h"
+#include <algorithm>
 
-BVH::BVH( float t0, float t1)
+void BVH::SortByAxis(int axis)
 {
+	std::sort(listPtr->begin(), listPtr->end(), [axis](Hitable *a, Hitable *b) {
+		AABB bboxLeft, bboxRight;
+		if (!a->bbox(0, 0, bboxLeft) ||
+			!b->bbox(0, 0, bboxRight))
+		{
+			std::cerr << "No bbox is found in bvh constructor!!" << std::endl;
+		}
+
+		return (bboxLeft.Min()[axis] < bboxRight.Min()[axis]);
+	});
+}
+
+BVH::BVH(std::vector<Hitable*> & hitList, float t0, float t1, RenderContext &context)
+	: BVH(context)
+{
+	listPtr = &hitList;
+
+	int listSize = int(listPtr->size());
+	if (listSize == 0)
+	{
+		return;
+	}
+
+	// sort them by any random axis
+	int axis = int(3 * contextPtr->rand.rSample());
+	SortByAxis(axis);
+
+	if (listSize == 1)
+	{
+		left = right = (*listPtr)[0];
+	}
+	else if (listSize == 2)
+	{
+		left = (*listPtr)[0];
+		right = (*listPtr)[1];
+	}
+	else
+	{
+		std::vector<Hitable*> lHalf(listPtr->begin(), listPtr->begin() + listSize / 2);
+		std::vector<Hitable*> rHalf(listPtr->begin() + listSize / 2, listPtr->end());
+		left = new BVH(lHalf, t0, t1, context);
+		right = new BVH(rHalf, t0, t1, context);
+	}
+
+	AABB bboxLeft, bboxRight;
+	if (!left->bbox(t0, t1, bboxLeft) ||
+		!right->bbox(t0, t1, bboxRight))
+	{
+		std::cerr << "No bbox is found in bvh constructor!!" << std::endl;
+	}
+
+	_bbox = Hitable::MergeBBoxes(bboxLeft, bboxRight);
+
 }
 
 bool BVH::hit(const Ray& r, float tMin, float tMax, HitRecord& rec) const
@@ -10,7 +64,7 @@ bool BVH::hit(const Ray& r, float tMin, float tMax, HitRecord& rec) const
 	{
 		HitRecord leftRec, rightRec;
 		bool hitLeft = left->hit(r, tMin, tMax, leftRec);
-		bool hitRight = left->hit(r, tMin, tMax, rightRec);
+		bool hitRight = right->hit(r, tMin, tMax, rightRec);
 
 		if (!hitLeft && !hitRight)
 		{

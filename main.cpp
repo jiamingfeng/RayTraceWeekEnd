@@ -7,6 +7,7 @@
 #include "sphere.h"
 #include "camera.h"
 #include "renderContext.h"
+#include "bvh.h"
 
 //std cout
 #include <iostream>
@@ -210,9 +211,9 @@ int main(int argc, char** argv)
 	float distToFocus = 10.0f;
 	float aperture = 0.1f;
 
-	Camera camera(lookFrom, lookAt, Vec3(0, 1, 0),
+	Camera camera(lookFrom, lookAt, Vec3(0, 1.f, 0),
 		          20.f, float(WIDTH) / float(HEIGHT),
-		          aperture, distToFocus, 0, 1, context);
+		          aperture, distToFocus, 0, 1.f, context);
 	
 
 
@@ -237,8 +238,8 @@ int main(int argc, char** argv)
 	//world->list[3] = &s3;
 	//world->list[4] = &s4;
 
-	HitableList* world = random_scene(context);
-
+	HitableList* scene = random_scene(context);
+	Hitable* world = new BVH (scene->list, 0.f, 1.f, context);
 
 
 
@@ -319,6 +320,7 @@ int main(int argc, char** argv)
 	}
 	//);
 
+	delete scene;
 	delete world;
 
 	end = Clock::now();
