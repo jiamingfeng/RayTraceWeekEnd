@@ -176,6 +176,92 @@ HitableList *random_scene(RenderContext & context) {
 	return world;
 }
 
+unsigned char* Render(int width, int height, int spp, Hitable* world, Camera &camera, RenderContext & context )
+{
+	time_point<Clock> start, end;
+
+	unsigned char* imageBuffer = nullptr;
+	if constexpr(!USE_PNG)
+	{
+		PPM_HEADER(width, height);
+	}
+
+	if constexpr(USE_PNG)
+	{
+		imageBuffer = new unsigned char[width * height * 3];
+	}
+
+	start = Clock::now();
+
+	// generate an increased sequence of integers
+	//std::vector<int> heights(HEIGHT);	
+	//std::generate(heights.begin(), heights.end(), [&]() { static int hi = 0; return hi++; });
+
+	//std::vector<int> widths(WIDTH);
+	//std::generate(widths.begin(), widths.end(), [&]() { static int wi = 0; return wi++; });
+
+	//#pragma omp parallel for collapse(2)
+	//#pragma omp parallel for if(parallelism_enabled)
+	//#pragma omp for ordered schedule(dynamic)
+	#pragma omp parallel for
+	for (int i = 0; i < height; ++i)
+		// std::for_each(std::execution::seq,
+		// 	std::begin(heights),
+		// 	std::end(heights),
+		// 	[&imageBuffer]( int i )
+	{
+
+		//std::for_each(std::execution::par_unseq,
+		//	std::begin(widths),
+		//	std::end(widths),
+		//	[&imagebuffer, i](int j) 
+		//#pragma omp parallel for
+
+		for (int j = 0; j < width; ++j)
+		{
+			// uniform distributed floating point values
+
+			Vec3 finalColor(0, 0, 0);
+			// iterator through all samples per pixel
+			for (int s = 0; s < spp; ++s)
+			{
+				float u = float(j + context.rand.rSample()) / float(width);
+				float v = float(height - 1 - i + context.rand.rSample()) / float(height);
+
+				Ray r(camera.CreateRay(u, v));
+
+				finalColor += RenderColor(r, world, 0);
+			}
+
+			finalColor = finalColor / float(spp);
+			finalColor = Vec3(pow(finalColor[0], 0.5f), pow(finalColor[1], 0.5f), pow(finalColor[2], 0.5f));
+			IntVec3 rgb(finalColor  * 255.f);
+
+			if constexpr(USE_PNG)
+			{
+
+				imageBuffer[3 * (i*width + j) + 0] = rgb.R();
+				imageBuffer[3 * (i*width + j) + 1] = rgb.G();
+				imageBuffer[3 * (i*width + j) + 2] = rgb.B();
+			}
+			else
+			{
+				//#pragma omp ordered
+				std::cout << rgb << std::endl;
+			}
+
+		}
+		//);
+	}
+	//);
+
+	end = Clock::now();
+	milliseconds diff = duration_cast<milliseconds>(end - start);
+	std::cout << "Ray trace time: " << diff.count() << "ms" << std::endl;
+
+	return imageBuffer;
+}
+
 
 int main(int argc, char** argv)
 {
@@ -241,92 +327,12 @@ int main(int argc, char** argv)
 	HitableList* scene = random_scene(context);
 	Hitable* world = new BVH (scene->list, 0.f, 1.f, context);
 
-
-
-	time_point<Clock> start, end;
-
-	unsigned char* imageBuffer = nullptr;
-	if constexpr(!USE_PNG)
-	{
-		PPM_HEADER(WIDTH, HEIGHT);
-	}	
-
-	if constexpr(USE_PNG)
-	{
-		imageBuffer = new unsigned char[WIDTH * HEIGHT * 3];
-	}
-
-	start = Clock::now();
-
-	// generate an increased sequence of integers
-	//std::vector<int> heights(HEIGHT);	
-	//std::generate(heights.begin(), heights.end(), [&]() { static int hi = 0; return hi++; });
-
-	//std::vector<int> widths(WIDTH);
-	//std::generate(widths.begin(), widths.end(), [&]() { static int wi = 0; return wi++; });
-	
-	//#pragma omp parallel for collapse(2)
-	//#pragma omp parallel for if(parallelism_enabled)
-	//#pragma omp for ordered schedule(dynamic)
-	#pragma omp parallel for
-	for (int i = 0; i < HEIGHT; ++i)
-	// std::for_each(std::execution::seq,
-	// 	std::begin(heights),
-	// 	std::end(heights),
-	// 	[&imageBuffer]( int i )
-	{
-
-		//std::for_each(std::execution::par_unseq,
-		//	std::begin(widths),
-		//	std::end(widths),
-		//	[&imagebuffer, i](int j) 
-		//#pragma omp parallel for
-
-		for (int j = 0; j < WIDTH; ++j)
-		{
-			// uniform distributed floating point values
-
-			Vec3 finalColor(0, 0, 0);
-			// iterator through all samples per pixel
-			for (int s = 0; s < SAMPLE_PER_PIXEL; ++s)
-			{
-				float u = float(j + context.rand.rSample()) / float(WIDTH);
-				float v = float(HEIGHT - 1 - i + context.rand.rSample()) / float(HEIGHT);
-
-				Ray r(camera.CreateRay(u, v));
-
-				finalColor += RenderColor(r, world, 0);
-			}
-
-			finalColor = finalColor / float(SAMPLE_PER_PIXEL);
-			finalColor = Vec3(pow(finalColor[0], 0.5f), pow(finalColor[1], 0.5f), pow(finalColor[2], 0.5f));
-			IntVec3 rgb(finalColor  * 255.f );
-
-			if constexpr(USE_PNG)
-			{
-				
-				imageBuffer[3 * (i*WIDTH + j) + 0] = rgb.R();
-				imageBuffer[3 * (i*WIDTH + j) + 1] = rgb.G();
-				imageBuffer[3 * (i*WIDTH + j) + 2] = rgb.B();
-			}
-			else
-			{
-				//#pragma omp ordered
-				std::cout << rgb << std::endl;
-			}
-
-		}
-		//);
-	}
-	//);
+	unsigned char* imageBuffer = Render(WIDTH, HEIGHT, SAMPLE_PER_PIXEL, world, camera, context);
 
 	delete scene;
 	delete world;
 
-	end = Clock::now();
-	milliseconds diff = duration_cast<milliseconds>(end - start);
-	std::cout << "Ray trace time: "<< diff.count() << "ms" << std::endl;
-
+	time_point<Clock> start, end;
 	start = Clock::now();
 	int result = 0;
 	if constexpr(USE_PNG)
@@ -338,7 +344,7 @@ int main(int argc, char** argv)
 	}
 	end = Clock::now();
 
-	diff = duration_cast<milliseconds>(end - start);
+	milliseconds diff = duration_cast<milliseconds>(end - start);
 	std::cout << "Png write time: " << diff.count() << "ms" << std::endl;
 	return getchar();
 }

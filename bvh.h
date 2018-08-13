@@ -12,11 +12,9 @@ public:
 
 	virtual bool hit(const Ray& r, float tMin, float tMax, HitRecord& rec) const override;
 	virtual bool bbox(float t0, float t1, AABB& box) const override;
-
-	std::vector<Hitable*> *listPtr;
 private:
 
-	void SortByAxis(int axis);
+	void SortByAxis(std::vector<Hitable*> &hitableList, int axis);
 
 	Hitable *left;
 	Hitable *right;

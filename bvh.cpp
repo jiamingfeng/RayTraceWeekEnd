@@ -1,9 +1,9 @@
 #include "bvh.h"
 #include <algorithm>
 
-void BVH::SortByAxis(int axis)
+void BVH::SortByAxis(std::vector<Hitable*> &hitableList, int axis)
 {
-	std::sort(listPtr->begin(), listPtr->end(), [axis](Hitable *a, Hitable *b) {
+	std::sort(hitableList.begin(), hitableList.end(), [axis](Hitable *a, Hitable *b) {
 		AABB bboxLeft, bboxRight;
 		if (!a->bbox(0, 0, bboxLeft) ||
 			!b->bbox(0, 0, bboxRight))
@@ -15,34 +15,37 @@ void BVH::SortByAxis(int axis)
 	});
 }
 
-BVH::BVH(std::vector<Hitable*> & hitList, float t0, float t1, RenderContext &context)
+BVH::BVH(std::vector<Hitable*> &hitList, float t0, float t1, RenderContext &context)
 	: BVH(context)
 {
-	listPtr = &hitList;
 
-	int listSize = int(listPtr->size());
+	int listSize = int(hitList.size());
 	if (listSize == 0)
 	{
 		return;
 	}
 
-	// sort them by any random axis
-	int axis = int(3 * contextPtr->rand.rSample());
-	SortByAxis(axis);
+
+	// sort them by any random axis ( hack it to sort only to x or z to avoid y axis )
+	int axis = int(2 * contextPtr->rand.rSample());
+	if (axis == 1)
+		axis = 2;
+	SortByAxis(hitList, axis);
+
 
 	if (listSize == 1)
 	{
-		left = right = (*listPtr)[0];
+		left = right = hitList[0];
 	}
 	else if (listSize == 2)
 	{
-		left = (*listPtr)[0];
-		right = (*listPtr)[1];
+		left = hitList[0];
+		right = hitList[1];
 	}
 	else
 	{
-		std::vector<Hitable*> lHalf(listPtr->begin(), listPtr->begin() + listSize / 2);
-		std::vector<Hitable*> rHalf(listPtr->begin() + listSize / 2, listPtr->end());
+		std::vector<Hitable*> lHalf(hitList.begin(), hitList.begin() + listSize / 2);
+		std::vector<Hitable*> rHalf(hitList.begin() + listSize / 2, hitList.end());
 		left = new BVH(lHalf, t0, t1, context);
 		right = new BVH(rHalf, t0, t1, context);
 	}

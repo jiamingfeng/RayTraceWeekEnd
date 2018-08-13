@@ -12,9 +12,9 @@ AABB Hitable::MergeBBoxes(const AABB& box0, const AABB& box1)
 		std::fminf(box0.Min().y(), box1.Min().y()),
 		std::fminf(box0.Min().z(), box1.Min().z()));
 
-	Vec3 bboxMax(std::fminf(box0.Max().x(), box1.Max().x()),
-		std::fminf(box0.Max().y(), box1.Max().y()),
-		std::fminf(box0.Max().z(), box1.Max().z()));
+	Vec3 bboxMax(std::fmaxf(box0.Max().x(), box1.Max().x()),
+		std::fmaxf(box0.Max().y(), box1.Max().y()),
+		std::fmaxf(box0.Max().z(), box1.Max().z()));
 
 	return AABB(bboxMin, bboxMax);
 }
@@ -56,6 +56,7 @@ bool HitableList::bbox(float t0, float t1, AABB& box) const
 		return false;
 	}
 
+	// merge all bbox in this hitable list
 	AABB eachBBox;
 	bool result = list[0]->bbox(t0, t1, eachBBox);
 	if (!result)
