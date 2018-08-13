@@ -6,6 +6,27 @@ Hitable::~Hitable()
 	delete mat; 
 }
 
+AABB Hitable::MergeBBoxes(const AABB& box0, const AABB& box1)
+{
+	Vec3 bboxMin(std::fminf(box0.Min().x(), box1.Min().x()),
+		std::fminf(box0.Min().y(), box1.Min().y()),
+		std::fminf(box0.Min().z(), box1.Min().z()));
+
+	Vec3 bboxMax(std::fminf(box0.Max().x(), box1.Max().x()),
+		std::fminf(box0.Max().y(), box1.Max().y()),
+		std::fminf(box0.Max().z(), box1.Max().z()));
+
+	return AABB(bboxMin, bboxMax);
+}
+
+HitableList::~HitableList()
+{
+	std::for_each(list.begin(), list.end(), [](Hitable* h)
+	{
+		delete h;
+	});
+}
+
 bool HitableList::hit(const Ray& r, float tMin, float tMax, HitRecord& rec) const 
 {
 
@@ -28,10 +49,26 @@ bool HitableList::hit(const Ray& r, float tMin, float tMax, HitRecord& rec) cons
 	return hitAnygthing;
 }
 
-HitableList::~HitableList()
+bool HitableList::bbox(float t0, float t1, AABB& box) const
 {
-	std::for_each(list.begin(), list.end(), [](Hitable* h)
+	if (list.size() == 0)
 	{
-		delete h;
+		return false;
+	}
+
+	AABB eachBBox;
+	auto iter = std::find_if_not(list.begin(), list.end(), [t0, t1, &eachBBox, &box](Hitable* h)-> bool {
+		bool hasBBox = h->bbox(t0, t1, eachBBox);
+		box = Hitable::MergeBBoxes(box, eachBBox);
+		return hasBBox;
 	});
+
+	// failed at iterating through all hitables
+	if (iter != list.end())
+	{
+		return false;
+	}
+
+	return true;
+
 }

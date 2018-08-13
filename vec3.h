@@ -61,7 +61,6 @@ public:
 };
 
 
-
 inline std::istream& operator>>(std::istream &is, Vec3 &t) {
 	is >> t.e[0] >> t.e[1] >> t.e[2];
 	return is;
@@ -187,3 +186,19 @@ inline Vec3& Vec3::operator/=(const float t) {
 inline Vec3 unit_vector(const Vec3& v) {
 	return v / v.length();
 }
+
+
+class LinearTimeVec3
+{
+public:
+	LinearTimeVec3() = default;
+	LinearTimeVec3(Vec3 v0, float t0, Vec3 v1, float t1) :
+		v0(v0), v1(v1), t0(t0), t1(t1) {}
+	Vec3 v(float t) const { return v0 + (t - t0) / (t1 - t0) * (v1 - v0); }
+private:
+	Vec3 v0;
+	Vec3 v1;
+
+	float t0;
+	float t1;
+};

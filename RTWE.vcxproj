@@ -122,11 +122,15 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="aabb.cpp" />
+    <ClCompile Include="bvh.cpp" />
     <ClCompile Include="hitable.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="Material.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="aabb.h" />
+    <ClInclude Include="bvh.h" />
     <ClInclude Include="camera.h" />
     <ClInclude Include="hitable.h" />
     <ClInclude Include="material.h" />

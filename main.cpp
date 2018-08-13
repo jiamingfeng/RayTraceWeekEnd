@@ -13,7 +13,7 @@
 
 #include <cmath>
 
-// max float
+// _max float
 #include <limits>
 
 // time
@@ -125,39 +125,52 @@ static Vec3 RenderColor(const Ray& r, const Hitable *world, unsigned int TraceDe
 }
 
 HitableList *random_scene(RenderContext & context) {
-	int n = 500;
 	HitableList *world = new HitableList();
-	world->list.reserve(500);
-	world->list.push_back(new Sphere(Vec3(0, -1000.f, 0), 1000.f, new Lambert(Vec3(0.5f, 0.5f, 0.5f), context)));
-	int i = 1;
-	for (int a = -11; a < 11; a++) {
-		for (int b = -11; b < 11; b++) {
+	//world->list.reserve(500);
+	//world->list.push_back(new Sphere(Vec3(0, -1000.f, 0), 1000.f, new Lambert(Vec3(0.5f, 0.5f, 0.5f), context)));
+	static const int numToScatter = 20;
+	std::atomic<int> li = 0;
+	world->list.resize(numToScatter * numToScatter * 4 + 4);
+	world->list[li++] = new Sphere(Vec3(0, -1000.f, 0), 1000.f, new Lambert(Vec3(0.5f, 0.5f, 0.5f), context));
+		
+	std::vector<int> scatters(numToScatter*2);
+	std::generate(scatters.begin(), scatters.end(), [&]() { static int i = -numToScatter; return i++; });
+	
+	std::for_each(std::execution::par, scatters.begin(), scatters.end(), [&context, &world, &li](int a){
+	//for (int a = -numToScatter; a < numToScatter; a++) {
+		for (int b = -numToScatter; b < numToScatter; b++) {
 			float choose_mat = context.rand.rSample();
 			Vec3 center(float(a) + 0.9f*context.rand.rSample(), 0.2f, float(b) + 0.9f*context.rand.rSample());
-			if ((center - Vec3(4.f, 0.2f, 0)).length() > 0.9f) {
+			LinearTimeVec3 movableCenter(center, 0.f, center + Vec3(0, 0.5f * context.rand.rSample(), 0), 1.0f);
+			Sphere *newSphere = nullptr;
+			//if ((center - Vec3(4.f, 0.2f, 0)).length() > 0.9f) 
+			{
 				if (choose_mat < 0.8f) {  // diffuse
-					world->list.push_back (new Sphere(center, 0.2f, new Lambert(
+					newSphere = new Sphere(movableCenter, 0.2f, new Lambert(
 						Vec3(context.rand.rSample()*context.rand.rSample(), 
 						context.rand.rSample()*context.rand.rSample(), 
-						context.rand.rSample()*context.rand.rSample()), context)));
+						context.rand.rSample()*context.rand.rSample()), context));
 				}
-				else if (choose_mat < 0.95f) { // metal
-					world->list.push_back(new Sphere(center, 0.2f,
+				else if (choose_mat < 0.95f && choose_mat >= 0.8f ) { // metal
+					newSphere = new Sphere(center, 0.2f,
 						new Metal(Vec3(0.5f*(1.f + context.rand.rSample()), 
 							0.5f*(1.f + context.rand.rSample()), 
 							0.5f*(1.f + context.rand.rSample())), 
-							0.5f*context.rand.rSample(), context)));
+							0.5f*context.rand.rSample(), context));
 				}
 				else {  // glass
-					world->list.push_back(new Sphere(center, 0.2f, new Dielectric(1.5f, context)));
+					newSphere = new Sphere(center, 0.2f, new Dielectric(1.5f, context));
 				}
+
+				world->list[li++] = newSphere;
 			}
 		}
 	}
+	);
 
-	world->list.push_back(new Sphere(Vec3(0, 1.f, 0), 1.f, new Dielectric(1.5f, context)));
-	world->list.push_back(new Sphere(Vec3(-4.f, 1.f, 0), 1.0f, new Lambert(Vec3(0.4f, 0.2f, 0.1f), context)));
-	world->list.push_back(new Sphere(Vec3(4.f, 1.f, 0), 1.0f, new Metal(Vec3(0.7f, 0.6f, 0.5f), 0.0, context)));
+	world->list[li++] = new Sphere(Vec3(0, 1.f, 0), 1.f, new Dielectric(1.5f, context)); 
+	world->list[li++] = new Sphere(Vec3(-4.f, 1.f, 0), 1.0f, new Lambert(Vec3(0.4f, 0.2f, 0.1f), context));
+	world->list[li++] = new Sphere(Vec3(4.f, 1.f, 0), 1.0f, new Metal(Vec3(0.7f, 0.6f, 0.5f), 0.0, context));
 
 	return world;
 }
@@ -167,7 +180,7 @@ int main(int argc, char** argv)
 {
 	int WIDTH = 1920;
 	int HEIGHT = 1080;
-	int SAMPLE_COUNT = 128;
+	int SAMPLE_PER_PIXEL = 128;
 	if (DoesArgumentExist(argc, argv, "-w"))
 	{
 		WIDTH = std::atoi(getArugmentOption(argc, argv, "-w").c_str());
@@ -180,7 +193,7 @@ int main(int argc, char** argv)
 
 	if (DoesArgumentExist(argc, argv, "-s"))
 	{
-		SAMPLE_COUNT = std::atoi(getArugmentOption(argc, argv, "-s").c_str());
+		SAMPLE_PER_PIXEL = std::atoi(getArugmentOption(argc, argv, "-s").c_str());
 	}
 
 	RenderContext context;
@@ -199,7 +212,7 @@ int main(int argc, char** argv)
 
 	Camera camera(lookFrom, lookAt, Vec3(0, 1, 0),
 		          20.f, float(WIDTH) / float(HEIGHT),
-		          aperture, distToFocus, context);
+		          aperture, distToFocus, 0, 1, context);
 	
 
 
@@ -274,7 +287,7 @@ int main(int argc, char** argv)
 
 			Vec3 finalColor(0, 0, 0);
 			// iterator through all samples per pixel
-			for (int s = 0; s < SAMPLE_COUNT; ++s)
+			for (int s = 0; s < SAMPLE_PER_PIXEL; ++s)
 			{
 				float u = float(j + context.rand.rSample()) / float(WIDTH);
 				float v = float(HEIGHT - 1 - i + context.rand.rSample()) / float(HEIGHT);
@@ -284,7 +297,7 @@ int main(int argc, char** argv)
 				finalColor += RenderColor(r, world, 0);
 			}
 
-			finalColor = finalColor / float(SAMPLE_COUNT);
+			finalColor = finalColor / float(SAMPLE_PER_PIXEL);
 			finalColor = Vec3(pow(finalColor[0], 0.5f), pow(finalColor[1], 0.5f), pow(finalColor[2], 0.5f));
 			IntVec3 rgb(finalColor  * 255.f );
 

@@ -46,7 +46,7 @@ static Vec3 RandomSampleInUnitSphere(Random &rand)
 bool Lambert::Scatter(const Ray& rIn, const HitRecord& rec, Vec3& attenuation, Ray& scattered) const
 {
 	Vec3 target = rec.p + rec.normal + RandomSampleInUnitSphere(contextPtr->rand);
-	scattered = Ray(rec.p, target - rec.p);
+	scattered = Ray(rec.p, target - rec.p, rIn.Time());
 	attenuation = albedo;
 
 	return true;
@@ -55,7 +55,7 @@ bool Lambert::Scatter(const Ray& rIn, const HitRecord& rec, Vec3& attenuation, R
 bool Metal::Scatter(const Ray& rIn, const HitRecord& rec, Vec3& attenuation, Ray& scattered) const
 {
 	Vec3 reflected = reflect(unit_vector(rIn.Direction()), rec.normal);
-	scattered = Ray(rec.p, reflected + roughness * RandomSampleInUnitSphere(contextPtr->rand));
+	scattered = Ray(rec.p, reflected + roughness * RandomSampleInUnitSphere(contextPtr->rand), rIn.Time());
 	attenuation = albedo;
 
 	return dot( scattered.Direction(), rec.normal) > 0;
@@ -100,11 +100,11 @@ bool Dielectric::Scatter(const Ray& rIn, const HitRecord& rec, Vec3& attenuation
 
 	if( contextPtr->rand.rSample() < reflect_prob)
 	{
-		scattered = Ray(rec.p, reflected);
+		scattered = Ray(rec.p, reflected, rIn.Time());
 	}
 	else
 	{
-		scattered = Ray(rec.p, refracted);
+		scattered = Ray(rec.p, refracted, rIn.Time());
 	}
 
 	return true;

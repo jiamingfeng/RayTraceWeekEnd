@@ -26,8 +26,9 @@ public:
 	static const float DEFAULT_ASPECT;
 
 	Camera() = default;
-	Camera(Vec3 lookFrom, Vec3 lookAt,Vec3 vUP, float vfov, 
+	Camera(Vec3 lookFrom, Vec3 lookAt,Vec3 vUP, float vfov/* in degrees*/, 
 		float aspect, float aperture, float focusDist,
+		float t0, float t1,
 		RenderContext& context);
 	~Camera() = default;
 
@@ -40,6 +41,7 @@ private:
 	Vec3 vertical = Vec3(0.0f, VIEW_HEIGHT, 0.0f);
 	// axises in camera space
 	Vec3 u, v, w;
+	float timeSO, timeSC; // times for shutter open and closed
 	float lensRadius;
 	RenderContext *contextPtr;
 };
@@ -50,9 +52,13 @@ const float Camera::VIEW_HEIGHT = DEFAULT_ASPECT * VIEW_WIDTH;
 
 Camera::Camera(Vec3 lookFrom, Vec3 lookAt, Vec3 vUP, 
 	float vfov, float aspect, float aperture, float focusDist,
+	float t0, float t1,
 	RenderContext& context)
 {
 	lensRadius = aperture / 2.f;
+	timeSO = t0;
+	timeSC = t1;
+
 	float theta = vfov * float(M_PI) / 180.f;
 	float half_height = tanf(theta / 2.f);
 	float half_width = aspect * half_height;
@@ -75,5 +81,6 @@ Ray Camera::CreateRay(float s, float t)
 {
 	Vec3 rd = lensRadius * RandomSampleInUnitDisk(contextPtr->rand);
 	Vec3 offsetOrigin = u * rd.x() + v * rd.y() + origin;
-	return Ray(offsetOrigin, lowerLeftCorner + s * horizontal + t * vertical - offsetOrigin);
+	float rayTime = timeSO + contextPtr->rand.rSample() * (timeSC - timeSO);
+	return Ray(offsetOrigin, lowerLeftCorner + s * horizontal + t * vertical - offsetOrigin, rayTime);
 }
