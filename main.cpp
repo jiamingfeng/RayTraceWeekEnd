@@ -130,21 +130,21 @@ static Vec3 RenderColor(const Ray& r, const Hitable *world, unsigned int TraceDe
 	return result;// * 255.f;  // 0 ~ 255
 }
 
-HitableList *random_scene(RenderContext & context) {
-	HitableList *world = new HitableList();
-	//world->list.reserve(500);
-	//world->list.push_back(new Sphere(Vec3(0, -1000.f, 0), 1000.f, new Lambert(Vec3(0.5f, 0.5f, 0.5f), context)));
+Hitable *random_scene(RenderContext & context) {
+	HitableList *randomHitableList = new HitableList();
+	//randomHitableList->list.reserve(500);
+	//randomHitableList->list.push_back(new Sphere(Vec3(0, -1000.f, 0), 1000.f, new Lambert(Vec3(0.5f, 0.5f, 0.5f), context)));
 	static const int numToScatter = 40;
 	std::atomic<int> li = 0;
-	world->list.resize(numToScatter * numToScatter * 4 + 4);
-	world->list[li++] = new Sphere(Vec3(0, -1000.f, 0), 1000.f, 
+	randomHitableList->list.resize(numToScatter * numToScatter * 4 + 4);
+	randomHitableList->list[li++] = new Sphere(Vec3(0, -1000.f, 0), 1000.f, 
 		new Lambert(CHECKER_TEXTURE,
 			context));
 		
 	std::vector<int> scatters(numToScatter*2);
 	std::generate(scatters.begin(), scatters.end(), [&]() { static int i = -numToScatter; return i++; });
 	
-	std::for_each(std::execution::par, scatters.begin(), scatters.end(), [&context, &world, &li](int a){
+	std::for_each(std::execution::par, scatters.begin(), scatters.end(), [&context, &randomHitableList, &li](int a){
 	//for (int a = -numToScatter; a < numToScatter; a++) {
 		for (int b = -numToScatter; b < numToScatter; b++) {
 			float choose_mat = context.rand.rSample();
@@ -170,17 +170,29 @@ HitableList *random_scene(RenderContext & context) {
 					newSphere = new Sphere(center, 0.2f, new Dielectric(1.5f, context));
 				}
 
-				world->list[li++] = newSphere;
+				randomHitableList->list[li++] = newSphere;
 			}
 		}
 	}
 	);
 
-	world->list[li++] = new Sphere(Vec3(0, 1.f, 0), 1.f, new Dielectric(1.5f, context)); 
-	world->list[li++] = new Sphere(Vec3(-4.f, 1.f, 0), 1.0f, new Lambert(Vec3(0.4f, 0.2f, 0.1f), context));
-	world->list[li++] = new Sphere(Vec3(4.f, 1.f, 0), 1.0f, new Metal(Vec3(0.7f, 0.6f, 0.5f), 0.0, context));
+	randomHitableList->list[li++] = new Sphere(Vec3(0, 1.f, 0), 1.f, new Dielectric(1.5f, context)); 
+	randomHitableList->list[li++] = new Sphere(Vec3(-4.f, 1.f, 0), 1.0f, new Lambert(Vec3(0.4f, 0.2f, 0.1f), context));
+	randomHitableList->list[li++] = new Sphere(Vec3(4.f, 1.f, 0), 1.0f, new Metal(Vec3(0.7f, 0.6f, 0.5f), 0.0, context));
+
+	Hitable* world = new BVH(randomHitableList->list, 0.f, 1.f, context);
 
 	return world;
+}
+
+Hitable *TwoSpheres(RenderContext & context)
+{
+	HitableList *hList = new HitableList();
+	hList->list.resize(2);
+	hList->list[0] = new Sphere(Vec3(0, -10.f, 0), 10.f, new Lambert(CHECKER_TEXTURE, context));
+	hList->list[1] = new Sphere(Vec3(0, 10.f, 0), 10.f, new Lambert(CHECKER_TEXTURE, context));
+
+	return hList;
 }
 
 unsigned char* Render(int width, int height, int spp, Hitable* world, Camera &camera, RenderContext & context )
@@ -307,36 +319,13 @@ int main(int argc, char** argv)
 	Camera camera(lookFrom, lookAt, Vec3(0, 1.f, 0),
 		          20.f, float(WIDTH) / float(HEIGHT),
 		          aperture, distToFocus, 0, 1.f, context);
+
+	Hitable* world = TwoSpheres(context);// random_scene(context);
 	
-
-
-	// define world
-	//HitableList* world = new HitableList();
-	//world->list.resize(4);
-	//Lambert mat1(Vec3(0.1f, 0.2f, 0.5f), context);
-	//Lambert mat2(Vec3(0.8f, 0.8f, 0.0f), context);
-	//Metal mat3(Vec3(0.8f, 0.6f, 0.2f), 0.2f, context);
-	////Metal mat4(Vec3(0.8f, 0.8f, 0.8f), 0.8f, context);
-	//Dielectric glass(1.5f, context);
-
-	//Sphere s0(Vec3(0.f, 0.2f, -1.0f), 0.5f, &mat1);
-	//Sphere s1(Vec3(0.f, -100.5f, -5.f), 100.f, &mat2);
-	//Sphere s2(Vec3(1.f, 0.f, -1.f), 0.5f, &mat3);
-	//Sphere s3(Vec3(-1.f, 0.f, -1.f), 0.5f, &glass);
-	//Sphere s4(Vec3(-1.f, 0.f, -1.f), -0.48f, &glass);
-	//
-	//world->list[0] = &s0;
-	//world->list[1] = &s1;
-	//world->list[2] = &s2;
-	//world->list[3] = &s3;
-	//world->list[4] = &s4;
-
-	HitableList* scene = random_scene(context);
-	Hitable* world = new BVH (scene->list, 0.f, 1.f, context);
 
 	unsigned char* imageBuffer = Render(WIDTH, HEIGHT, SAMPLE_PER_PIXEL, world, camera, context);
 
-	delete scene;
+	//delete scene;
 	delete world;
 
 	time_point<Clock> start, end;
