@@ -29,6 +29,11 @@ static const bool USE_PNG = true;
 //const bool parallelism_enabled = true;
 static const unsigned int MAX_TRACE_DEPTH = 50;
 
+// constants
+static const ConstantTexture t0(Vec3(1.f, 1.f, 0.9f));
+static const ConstantTexture t1(Vec3(0.61f, 0.12f, 0.73f));
+static const CheckerTexture CHECKER_TEXTURE(CheckerTexture(t0, t1));
+
 
 // C++ 17 parallel
 #ifdef __clang__
@@ -129,10 +134,12 @@ HitableList *random_scene(RenderContext & context) {
 	HitableList *world = new HitableList();
 	//world->list.reserve(500);
 	//world->list.push_back(new Sphere(Vec3(0, -1000.f, 0), 1000.f, new Lambert(Vec3(0.5f, 0.5f, 0.5f), context)));
-	static const int numToScatter = 20;
+	static const int numToScatter = 40;
 	std::atomic<int> li = 0;
 	world->list.resize(numToScatter * numToScatter * 4 + 4);
-	world->list[li++] = new Sphere(Vec3(0, -1000.f, 0), 1000.f, new Lambert(Vec3(0.5f, 0.5f, 0.5f), context));
+	world->list[li++] = new Sphere(Vec3(0, -1000.f, 0), 1000.f, 
+		new Lambert(CHECKER_TEXTURE,
+			context));
 		
 	std::vector<int> scatters(numToScatter*2);
 	std::generate(scatters.begin(), scatters.end(), [&]() { static int i = -numToScatter; return i++; });

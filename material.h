@@ -1,6 +1,6 @@
 #pragma once
 
-#include "vec3.h"
+#include "texture.h"
 #include "renderContext.h"
 
 #include <algorithm>
@@ -21,12 +21,16 @@ protected:
 class Lambert : public Material
 {
 public:
-	Lambert(const Vec3& albedo, RenderContext& context) : 
-		albedo(albedo), Material(context) 
+	Lambert(const Texture& albedo, RenderContext& context) : 
+		albedoTexture(&albedo), Material(context)
+	{}
+	Lambert(const Vec3& albedo, RenderContext& context) :
+		albedo(albedo), Material(context)
 	{}
 	virtual bool Scatter(const Ray& rIn, const HitRecord& rec, Vec3& attenuation, Ray& scattered) const override;
 
 private:
+	const Texture *albedoTexture = nullptr;
 	Vec3 albedo;
 };
 
