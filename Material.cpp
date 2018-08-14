@@ -32,12 +32,12 @@ float schlick(float cosine, float reflectionIndex)
 	return r0 + (1 - r0) * powf((1 - cosine), 5.f);
 }
 
-static Vec3 RandomSampleInUnitSphere(Random &rand) 
+static Vec3 RandomSampleInUnitSphere(Random &Rand) 
 {
 	Vec3 p;
 	do {
-		//p = 2.0 * Vec3(rand.rDiffuse(), rand.rDiffuse(), rand.rDiffuse()) - Vec3( 1.f, 1.f, 1.f);
-		p = Vec3(rand.rDiffuse(), rand.rDiffuse(), rand.rDiffuse());
+		//p = 2.0 * Vec3(Rand.rDiffuse(), Rand.rDiffuse(), Rand.rDiffuse()) - Vec3( 1.f, 1.f, 1.f);
+		p = Vec3(Rand.rDiffuse(), Rand.rDiffuse(), Rand.rDiffuse());
 	} while (p.squared_length() >= 1.0f);
 
 	return p;
@@ -45,9 +45,9 @@ static Vec3 RandomSampleInUnitSphere(Random &rand)
 
 bool Lambert::Scatter(const Ray& rIn, const HitRecord& rec, Vec3& attenuation, Ray& scattered) const
 {
-	Vec3 target = rec.p + rec.normal + RandomSampleInUnitSphere(contextPtr->rand);
+	Vec3 target = rec.p + rec.normal + RandomSampleInUnitSphere(contextPtr.lock()->Rand);
 	scattered = Ray(rec.p, target - rec.p, rIn.Time());
-	attenuation = albedoTexture ? albedoTexture->value(0, 0, rec.p) : albedo;
+	attenuation = albedoTexture.lock() ? albedoTexture.lock()->value(0, 0, rec.p) : albedo;
 
 	return true;
 }
@@ -55,7 +55,7 @@ bool Lambert::Scatter(const Ray& rIn, const HitRecord& rec, Vec3& attenuation, R
 bool Metal::Scatter(const Ray& rIn, const HitRecord& rec, Vec3& attenuation, Ray& scattered) const
 {
 	Vec3 reflected = reflect(unit_vector(rIn.Direction()), rec.normal);
-	scattered = Ray(rec.p, reflected + roughness * RandomSampleInUnitSphere(contextPtr->rand), rIn.Time());
+	scattered = Ray(rec.p, reflected + roughness * RandomSampleInUnitSphere(contextPtr.lock()->Rand), rIn.Time());
 	attenuation = albedo;
 
 	return dot( scattered.Direction(), rec.normal) > 0;
@@ -98,7 +98,7 @@ bool Dielectric::Scatter(const Ray& rIn, const HitRecord& rec, Vec3& attenuation
 		reflect_prob = 1.f;
 	}
 
-	if( contextPtr->rand.rSample() < reflect_prob)
+	if(contextPtr.lock()->Rand.rSample() < reflect_prob)
 	{
 		scattered = Ray(rec.p, reflected, rIn.Time());
 	}

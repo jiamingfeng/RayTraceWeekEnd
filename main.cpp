@@ -12,8 +12,6 @@
 //std cout
 #include <iostream>
 
-#include <cmath>
-
 // _max float
 #include <limits>
 
@@ -29,11 +27,6 @@ static const bool USE_PNG = true;
 //const bool parallelism_enabled = true;
 static const unsigned int MAX_TRACE_DEPTH = 50;
 
-// constants
-static const ConstantTexture t0(Vec3(1.f, 1.f, 0.9f));
-static const ConstantTexture t1(Vec3(0.61f, 0.12f, 0.73f));
-static const CheckerTexture CHECKER_TEXTURE(CheckerTexture(t0, t1));
-
 
 // C++ 17 parallel
 #ifdef __clang__
@@ -47,6 +40,10 @@ namespace fs = std::experimental::filesystem;
 #include <filesystem>
 namespace fs = std::filesystem;
 #endif
+
+//global variables
+std::vector<MaterialSP> MaterialList;
+//std::vector<TextureSP> TextureList;
 
 
 void PPM_HEADER(int width, int height)
@@ -106,7 +103,7 @@ bool DoesArgumentExist(int argc, char** argv, const std::string& option)
 }
 
 
-static Vec3 RenderColor(const Ray& r, const Hitable *world, unsigned int TraceDepth)
+static Vec3 RenderColor(const Ray& r, HitableSP world, unsigned int TraceDepth)
 {
 	HitRecord recHit;
 	Vec3 result(0.f, 0.f, 0.f);
@@ -116,7 +113,9 @@ static Vec3 RenderColor(const Ray& r, const Hitable *world, unsigned int TraceDe
 	{
 		Ray scatted;
 		Vec3 attenuation;
-		if (TraceDepth < MAX_TRACE_DEPTH && recHit.mat->Scatter(r, recHit, attenuation, scatted))
+		if (TraceDepth < MAX_TRACE_DEPTH && 
+			recHit.mat.lock() && 
+			recHit.mat.lock()->Scatter(r, recHit, attenuation, scatted))
 		{
 			result = attenuation * RenderColor(scatted, world, TraceDepth+1);
 		}		
@@ -130,72 +129,92 @@ static Vec3 RenderColor(const Ray& r, const Hitable *world, unsigned int TraceDe
 	return result;// * 255.f;  // 0 ~ 255
 }
 
-Hitable *random_scene(RenderContext & context) {
-	HitableList *randomHitableList = new HitableList();
+HitableSP random_scene(TextureLibPtr textureLib, RenderContextSP context) {
+	std::shared_ptr<HitableList> randomHitableList = std::make_shared<HitableList>();
 	//randomHitableList->list.reserve(500);
 	//randomHitableList->list.push_back(new Sphere(Vec3(0, -1000.f, 0), 1000.f, new Lambert(Vec3(0.5f, 0.5f, 0.5f), context)));
 	static const int numToScatter = 40;
 	std::atomic<int> li = 0;
 	randomHitableList->list.resize(numToScatter * numToScatter * 4 + 4);
-	randomHitableList->list[li++] = new Sphere(Vec3(0, -1000.f, 0), 1000.f, 
-		new Lambert(CHECKER_TEXTURE,
-			context));
+
+	MaterialSP mat = std::make_shared<Lambert>(textureLib->GetTexture("Checker"),
+		context);
+	MaterialList.push_back(mat);
+	randomHitableList->list[li++] = std::make_shared<Sphere>(Vec3(0, -1000.f, 0), 1000.f, mat);
 		
 	std::vector<int> scatters(numToScatter*2);
 	std::generate(scatters.begin(), scatters.end(), [&]() { static int i = -numToScatter; return i++; });
+
+	std::atomic<int> matIndex = int(MaterialList.size());
+	MaterialList.resize(matIndex + numToScatter * 2 * numToScatter * 2);
 	
-	std::for_each(std::execution::par, scatters.begin(), scatters.end(), [&context, &randomHitableList, &li](int a){
+	std::for_each(std::execution::par, scatters.begin(), scatters.end(), [&context, &randomHitableList, &li, &matIndex](int a){
 	//for (int a = -numToScatter; a < numToScatter; a++) {
 		for (int b = -numToScatter; b < numToScatter; b++) {
-			float choose_mat = context.rand.rSample();
-			Vec3 center(float(a) + 0.9f*context.rand.rSample(), 0.2f, float(b) + 0.9f*context.rand.rSample());
-			LinearTimeVec3 movableCenter(center, 0.f, center + Vec3(0, 0.5f * context.rand.rSample(), 0), 1.0f);
-			Sphere *newSphere = nullptr;
+			float choose_mat = context->Rand.rSample();
+			Vec3 center(float(a) + 0.9f*context->Rand.rSample(), 0.2f, float(b) + 0.9f*context->Rand.rSample());
+			LinearTimeVec3 movableCenter(center, 0.f, center + Vec3(0, 0.5f * context->Rand.rSample(), 0), 1.0f);
+			HitableSP newSphere = {};
+			MaterialSP tempMat = {};
 			//if ((center - Vec3(4.f, 0.2f, 0)).length() > 0.9f) 
 			{
 				if (choose_mat < 0.8f) {  // diffuse
-					newSphere = new Sphere(movableCenter, 0.2f, new Lambert(
-						Vec3(context.rand.rSample()*context.rand.rSample(), 
-						context.rand.rSample()*context.rand.rSample(), 
-						context.rand.rSample()*context.rand.rSample()), context));
+					tempMat = std::make_shared<Lambert>(
+						Vec3(context->Rand.rSample()*context->Rand.rSample(),
+							context->Rand.rSample()*context->Rand.rSample(),
+							context->Rand.rSample()*context->Rand.rSample()), context);
+					newSphere = std::make_shared<Sphere>(movableCenter, 0.2f, tempMat);
 				}
 				else if (choose_mat < 0.95f && choose_mat >= 0.8f ) { // metal
-					newSphere = new Sphere(center, 0.2f,
-						new Metal(Vec3(0.5f*(1.f + context.rand.rSample()), 
-							0.5f*(1.f + context.rand.rSample()), 
-							0.5f*(1.f + context.rand.rSample())), 
-							0.5f*context.rand.rSample(), context));
+					tempMat = std::make_shared<Metal>(Vec3(0.5f*(1.f + context->Rand.rSample()),
+						0.5f*(1.f + context->Rand.rSample()),
+						0.5f*(1.f + context->Rand.rSample())),
+						0.5f*context->Rand.rSample(), context);
+					newSphere = std::make_shared<Sphere>(center, 0.2f,
+						tempMat);
 				}
 				else {  // glass
-					newSphere = new Sphere(center, 0.2f, new Dielectric(1.5f, context));
+					tempMat = std::make_shared<Dielectric>(1.5f, context);
+					newSphere = std::make_shared<Sphere>(center, 0.2f, tempMat);
 				}
+
+				MaterialList[matIndex++] = tempMat;
 
 				randomHitableList->list[li++] = newSphere;
 			}
 		}
 	}
 	);
+	mat = std::make_shared<Dielectric>(1.5f, context);
+	MaterialList.push_back(mat);
+	randomHitableList->list[li++] = std::make_shared<Sphere>(Vec3(0, 1.f, 0), 1.f, mat);
+	mat = std::make_shared<Lambert>(Vec3(0.4f, 0.2f, 0.1f), context);
+	MaterialList.push_back(mat);
+	randomHitableList->list[li++] = std::make_shared<Sphere>(Vec3(-4.f, 1.f, 0), 1.0f, mat);
+	mat = std::make_shared<Metal>(Vec3(0.7f, 0.6f, 0.5f), 0.0f, context);
+	MaterialList.push_back(mat);
+	randomHitableList->list[li++] = std::make_shared<Sphere>(Vec3(4.f, 1.f, 0), 1.0f, mat);
 
-	randomHitableList->list[li++] = new Sphere(Vec3(0, 1.f, 0), 1.f, new Dielectric(1.5f, context)); 
-	randomHitableList->list[li++] = new Sphere(Vec3(-4.f, 1.f, 0), 1.0f, new Lambert(Vec3(0.4f, 0.2f, 0.1f), context));
-	randomHitableList->list[li++] = new Sphere(Vec3(4.f, 1.f, 0), 1.0f, new Metal(Vec3(0.7f, 0.6f, 0.5f), 0.0, context));
-
-	Hitable* world = new BVH(randomHitableList->list, 0.f, 1.f, context);
+	HitableSP world = std::make_shared<BVH>(randomHitableList->list, 0.f, 1.f, context);
 
 	return world;
 }
 
-Hitable *TwoSpheres(RenderContext & context)
+HitableSP TwoSpheres(TextureLibPtr textureLib, RenderContextSP context)
 {
-	HitableList *hList = new HitableList();
+	std::shared_ptr<HitableList> hList = std::make_shared<HitableList>();
 	hList->list.resize(2);
-	hList->list[0] = new Sphere(Vec3(0, -10.f, 0), 10.f, new Lambert(CHECKER_TEXTURE, context));
-	hList->list[1] = new Sphere(Vec3(0, 10.f, 0), 10.f, new Lambert(CHECKER_TEXTURE, context));
+	MaterialSP m1 = std::make_shared<Lambert>(textureLib->GetRandomTexture(), context);
+	MaterialSP m2 = std::make_shared<Lambert>(textureLib->GetRandomTexture(), context);
+	MaterialList.push_back(m1);
+	MaterialList.push_back(m2);
+	hList->list[0] = std::make_shared<Sphere>(Vec3(0, -10.f, 0), 10.f, m1);
+	hList->list[1] = std::make_shared<Sphere>(Vec3(0, 10.f, 0), 10.f, m2);
 
 	return hList;
 }
 
-unsigned char* Render(int width, int height, int spp, Hitable* world, Camera &camera, RenderContext & context )
+unsigned char* Render(int width, int height, int spp, HitableSP world, Camera &camera, RenderContextSP context )
 {
 	time_point<Clock> start, end;
 
@@ -244,8 +263,8 @@ unsigned char* Render(int width, int height, int spp, Hitable* world, Camera &ca
 			// iterator through all samples per pixel
 			for (int s = 0; s < spp; ++s)
 			{
-				float u = float(j + context.rand.rSample()) / float(width);
-				float v = float(height - 1 - i + context.rand.rSample()) / float(height);
+				float u = float(j + context->Rand.rSample()) / float(width);
+				float v = float(height - 1 - i + context->Rand.rSample()) / float(height);
 
 				Ray r(camera.CreateRay(u, v));
 
@@ -302,14 +321,21 @@ int main(int argc, char** argv)
 		SAMPLE_PER_PIXEL = std::atoi(getArugmentOption(argc, argv, "-s").c_str());
 	}
 
-	RenderContext context;
+	auto context = std::make_shared<RenderContext>();
+
+	// constants
+	TextureSP t0 = std::make_shared<ConstantTexture>(Vec3(1.f, 1.f, 0.9f));
+	TextureSP t1 = std::make_shared<ConstantTexture>(Vec3(0.61f, 0.12f, 0.73f));
+	TextureSP checkerTexture = std::make_shared<CheckerTexture>(t0, t1);
+
+	auto textureLib = std::make_shared<TextureLibrary>(context);
+
+	textureLib->AddTextureToLibrary("t0", t0);
+	textureLib->AddTextureToLibrary("t1", t1);
+	textureLib->AddTextureToLibrary("Checker", checkerTexture);
 
 	const float VIEW_WIDTH = 4.0f;
 	const float VIEW_HEIGHT = float(HEIGHT) / float(WIDTH) * VIEW_WIDTH;
-	//Vec3 lookFrom(3.f, 3.f, 2.f);
-	//Vec3 lookAt(0, 0, -1.f);
-	//float distToFocus = (lookFrom - lookAt).length();
-	//float aperture = 0.5f;
 
 	Vec3 lookFrom(13.f, 2.f, 3.f);
 	Vec3 lookAt(0, 0, 0);
@@ -320,13 +346,11 @@ int main(int argc, char** argv)
 		          20.f, float(WIDTH) / float(HEIGHT),
 		          aperture, distToFocus, 0, 1.f, context);
 
-	Hitable* world = TwoSpheres(context);// random_scene(context);
+	HitableSP world = random_scene(textureLib, context);
+	//HitableSP world = TwoSpheres(textureLib, context);
 	
 
 	unsigned char* imageBuffer = Render(WIDTH, HEIGHT, SAMPLE_PER_PIXEL, world, camera, context);
-
-	//delete scene;
-	delete world;
 
 	time_point<Clock> start, end;
 	start = Clock::now();

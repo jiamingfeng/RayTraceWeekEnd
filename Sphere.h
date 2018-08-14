@@ -6,8 +6,8 @@ class Sphere :
 {
 public:
 	Sphere() = delete;
-	Sphere(const Vec3& Center, float Radius, Material* newMat) : center(Center), radius(Radius), Hitable(newMat) {}
-	Sphere(const LinearTimeVec3& Center, float Radius, Material* newMat) : movableCenter(Center), radius(Radius), moveable(true), Hitable(newMat) {}
+	Sphere(const Vec3& Center, float Radius, MaterialSP newMat) : center(Center), radius(Radius), Hitable(newMat) {}
+	Sphere(const LinearTimeVec3& Center, float Radius, MaterialSP newMat) : movableCenter(Center), radius(Radius), moveable(true), Hitable(newMat) {}
 	~Sphere() = default;
 
 	virtual bool hit(const Ray& r, float tMin, float tMax, HitRecord& rec) const override;

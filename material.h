@@ -3,41 +3,42 @@
 #include "texture.h"
 #include "renderContext.h"
 
-#include <algorithm>
-
 class Ray;
 struct HitRecord;
 
 class Material
 {
 public:
-	Material( RenderContext& context) : contextPtr(&context) {}
+	Material( RenderContextSP context) : contextPtr(context) {}
 	virtual bool Scatter(const Ray& rIn, const HitRecord& rec, Vec3& attenuation, Ray& scattered) const = 0;
 
 protected:
-	RenderContext* contextPtr;
+	RenderContextWP contextPtr;
 };
+
+#define MaterialSP std::shared_ptr<Material>
+#define MaterialWP std::weak_ptr<Material>
 
 class Lambert : public Material
 {
 public:
-	Lambert(const Texture& albedo, RenderContext& context) : 
-		albedoTexture(&albedo), Material(context)
+	Lambert(TextureSP albedo, RenderContextSP context) :
+		albedoTexture(albedo), Material(context)
 	{}
-	Lambert(const Vec3& albedo, RenderContext& context) :
+	Lambert(const Vec3& albedo, RenderContextSP context) :
 		albedo(albedo), Material(context)
 	{}
 	virtual bool Scatter(const Ray& rIn, const HitRecord& rec, Vec3& attenuation, Ray& scattered) const override;
 
 private:
-	const Texture *albedoTexture = nullptr;
+	TextureWP albedoTexture;
 	Vec3 albedo;
 };
 
 class Metal : public Material
 {
 public:
-	Metal(const Vec3& albedo, float roughness, RenderContext& context) :
+	Metal(const Vec3& albedo, float roughness, RenderContextSP context) :
 		albedo(albedo), roughness( std::clamp( roughness, 0.f, 1.0f) ), Material(context)
 	{}
 	virtual bool Scatter(const Ray& rIn, const HitRecord& rec, Vec3& attenuation, Ray& scattered) const override;
@@ -50,7 +51,7 @@ private:
 class Dielectric : public Material
 {
 public:
-	Dielectric(float reflectIndex, RenderContext& context) :
+	Dielectric(float reflectIndex, RenderContextSP context) :
 		reflectIndex(reflectIndex),
 		Material(context) {}
 

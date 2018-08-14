@@ -1,11 +1,11 @@
 #pragma once
 
 #include "aabb.h"
-
-#include <vector>
-#include <algorithm>
+#include "core.h"
 
 class Material;
+#define MaterialSP std::shared_ptr<Material>
+#define MaterialWP std::weak_ptr<Material>
 
 struct HitRecord 
 {
@@ -16,12 +16,12 @@ struct HitRecord
 	Vec3 normal;
 	float t;
 
-	Material *mat;
+	MaterialWP mat;
 };
 
 class Hitable {
 public:
-	Hitable(Material* newMat = nullptr) : mat(newMat) {}
+	Hitable(MaterialSP newMat = {}) : mat(newMat) {}
 	virtual ~Hitable();
 	virtual bool hit(const Ray& r, float tMin, float tMax, HitRecord& rec) const = 0;
 	virtual bool bbox(float t0, float t1, AABB& box) const = 0;
@@ -29,16 +29,19 @@ public:
 	static AABB MergeBBoxes(const AABB& bbox0, const AABB& bbox1);
 
 protected: 
-	Material * mat;
+	MaterialWP mat;
 };
+
+#define HitableSP std::shared_ptr<Hitable>
+#define HitableWP std::weak_ptr<Hitable>
 
 class HitableList : public Hitable {
 public:
-	HitableList(Material* newMat=nullptr) : Hitable(newMat) {};
+	HitableList(MaterialSP newMat = {}) : Hitable(newMat) {};
 	~HitableList();
 
 	virtual bool hit(const Ray& r, float tMin, float tMax, HitRecord& rec) const override;
 	virtual bool bbox(float t0, float t1, AABB& box) const override;
 
-	std::vector<Hitable*> list;
+	std::vector<HitableSP> list;
 };
