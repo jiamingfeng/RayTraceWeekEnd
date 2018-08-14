@@ -320,7 +320,8 @@ int main(int argc, char** argv)
 		          20.f, float(WIDTH) / float(HEIGHT),
 		          aperture, distToFocus, 0, 1.f, context);
 
-	Hitable* world = TwoSpheres(context);// random_scene(context);
+	//TwoSpheres(context);// 
+	Hitable* world = random_scene(context);
 	
 
 	unsigned char* imageBuffer = Render(WIDTH, HEIGHT, SAMPLE_PER_PIXEL, world, camera, context);
