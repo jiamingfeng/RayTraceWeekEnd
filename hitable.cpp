@@ -2,7 +2,8 @@
 #include "material.h"
 
 Hitable::~Hitable()
-{
+{ 
+	delete mat; 
 }
 
 AABB Hitable::MergeBBoxes(const AABB& box0, const AABB& box1)
@@ -20,12 +21,10 @@ AABB Hitable::MergeBBoxes(const AABB& box0, const AABB& box1)
 
 HitableList::~HitableList()
 {
-	//std::for_each(list.begin(), list.end(), [](Hitable* h)
-	//{
-	//	delete h;
-	//});
-
-	list.clear();
+	std::for_each(list.begin(), list.end(), [](Hitable* h)
+	{
+		delete h;
+	});
 }
 
 bool HitableList::hit(const Ray& r, float tMin, float tMax, HitRecord& rec) const 
@@ -36,12 +35,8 @@ bool HitableList::hit(const Ray& r, float tMin, float tMax, HitRecord& rec) cons
 	float closestSoFar = tMax;
 
 	// test the ray for each hitable items in list and return the nearest hit
-	std::for_each(list.begin(), list.end(), [&r, &rec, &tempRec, &hitAnygthing, &closestSoFar, tMin](HitableSP h)
+	std::for_each(list.begin(), list.end(), [&r, &rec, &tempRec, &hitAnygthing, &closestSoFar, tMin](Hitable* h)
 	{
-		if (!h)
-		{
-			return;
-		}
 
 		if (h->hit(r, tMin, closestSoFar, tempRec))
 		{
@@ -70,13 +65,7 @@ bool HitableList::bbox(float t0, float t1, AABB& box) const
 	}
 
 	box = eachBBox;
-	auto iter = std::find_if_not(list.begin(), list.end(), [t0, t1, &eachBBox, &box](HitableSP h) {
-
-		if (!h)
-		{
-			return false;
-		}		
-
+	auto iter = std::find_if_not(list.begin(), list.end(), [t0, t1, &eachBBox, &box](Hitable* h) {
 		bool hasBBox = h->bbox(t0, t1, eachBBox);
 		box = Hitable::MergeBBoxes(box, eachBBox);
 		return hasBBox;

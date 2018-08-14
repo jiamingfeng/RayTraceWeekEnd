@@ -6,13 +6,13 @@
 #include "ray.h"
 #include "renderContext.h"
 
-static Vec3 RandomSampleInUnitDisk(Random &Rand)
+static Vec3 RandomSampleInUnitDisk(Random &rand)
 {
 	Vec3 p;
 	do {
-		//p = 2.0 * Vec3(Rand.rDiffuse(), Rand.rDiffuse(), Rand.rDiffuse()) - Vec3( 1.f, 1.f, 1.f);
-		p = Vec3(Rand.rDiffuse(), Rand.rDiffuse(), 0);
-		//p = 2.0 * Vec3(Rand.rSample(), Rand.rSample(), 0) - Vec3(1, 1, 0);
+		//p = 2.0 * Vec3(rand.rDiffuse(), rand.rDiffuse(), rand.rDiffuse()) - Vec3( 1.f, 1.f, 1.f);
+		p = Vec3(rand.rDiffuse(), rand.rDiffuse(), 0);
+		//p = 2.0 * Vec3(rand.rSample(), rand.rSample(), 0) - Vec3(1, 1, 0);
 	} while (dot(p, p) >= 1.0f);
 
 	return p;
@@ -29,7 +29,7 @@ public:
 	Camera(Vec3 lookFrom, Vec3 lookAt,Vec3 vUP, float vfov/* in degrees*/, 
 		float aspect, float aperture, float focusDist,
 		float t0, float t1,
-		RenderContextSP context);
+		RenderContext& context);
 	~Camera() = default;
 
 	Ray CreateRay(float u, float v);
@@ -43,7 +43,7 @@ private:
 	Vec3 u, v, w;
 	float timeSO, timeSC; // times for shutter open and closed
 	float lensRadius;
-	RenderContextWP contextPtr;
+	RenderContext *contextPtr;
 };
 
 const float Camera::DEFAULT_ASPECT = 0.5625f;
@@ -53,7 +53,7 @@ const float Camera::VIEW_HEIGHT = DEFAULT_ASPECT * VIEW_WIDTH;
 Camera::Camera(Vec3 lookFrom, Vec3 lookAt, Vec3 vUP, 
 	float vfov, float aspect, float aperture, float focusDist,
 	float t0, float t1,
-	RenderContextSP context)
+	RenderContext& context)
 {
 	lensRadius = aperture / 2.f;
 	timeSO = t0;
@@ -74,13 +74,13 @@ Camera::Camera(Vec3 lookFrom, Vec3 lookAt, Vec3 vUP,
 	horizontal = half_width * 2.0f * u * focusDist;
 	vertical = half_height * 2.0f * v * focusDist;
 
-	contextPtr = context;
+	contextPtr = &context;
 }
 
 Ray Camera::CreateRay(float s, float t)
 {
-	Vec3 rd = lensRadius * RandomSampleInUnitDisk(contextPtr.lock()->Rand);
+	Vec3 rd = lensRadius * RandomSampleInUnitDisk(contextPtr->rand);
 	Vec3 offsetOrigin = u * rd.x() + v * rd.y() + origin;
-	float rayTime = timeSO + contextPtr.lock()->Rand.rSample() * (timeSC - timeSO);
+	float rayTime = timeSO + contextPtr->rand.rSample() * (timeSC - timeSO);
 	return Ray(offsetOrigin, lowerLeftCorner + s * horizontal + t * vertical - offsetOrigin, rayTime);
 }

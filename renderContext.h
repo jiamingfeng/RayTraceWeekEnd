@@ -1,12 +1,8 @@
 #pragma once
 
 #include "random.h"
-#include "core.h"
 
 struct RenderContext
 {
-	Random Rand;
+	Random rand;
 };
-
-#define RenderContextSP std::shared_ptr<RenderContext>
-#define RenderContextWP std::weak_ptr<RenderContext>

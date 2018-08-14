@@ -133,7 +133,6 @@
     <ClInclude Include="aabb.h" />
     <ClInclude Include="bvh.h" />
     <ClInclude Include="camera.h" />
-    <ClInclude Include="core.h" />
     <ClInclude Include="hitable.h" />
     <ClInclude Include="material.h" />
     <ClInclude Include="random.h" />
