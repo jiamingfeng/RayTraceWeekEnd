@@ -41,6 +41,9 @@ public:
 	inline float squared_length() const { return e[0] * e[0] + e[1] * e[1] + e[2] * e[2]; }
 	inline void make_unit_vector();
 
+	typedef float(*mapF)(float);
+	inline Vec3 map(mapF mapFunc) const;
+
 
 	float e[3];
 };
@@ -84,6 +87,17 @@ inline std::ostream& operator<<(std::ostream &os, const IntVec3 &t) {
 inline void Vec3::make_unit_vector() {
 	float k = 1.0f / sqrt(e[0] * e[0] + e[1] * e[1] + e[2] * e[2]);
 	e[0] *= k; e[1] *= k; e[2] *= k;
+}
+
+inline Vec3 Vec3::map(mapF mapFunc) const
+{
+	Vec3 result;
+	for (int i = 0; i < 3; ++i)
+	{
+		result[i] = mapFunc(e[i]);
+	}
+
+	return result;
 }
 
 inline Vec3 operator+(const Vec3 &v1, const Vec3 &v2) {

@@ -8,6 +8,7 @@
 #include "camera.h"
 #include "renderContext.h"
 #include "bvh.h"
+#include "perlin.h"
 
 //std cout
 #include <iostream>
@@ -30,9 +31,37 @@ static const bool USE_PNG = true;
 static const unsigned int MAX_TRACE_DEPTH = 50;
 
 // constants
-static const ConstantTexture t0(Vec3(1.f, 1.f, 0.9f));
-static const ConstantTexture t1(Vec3(0.61f, 0.12f, 0.73f));
-static const CheckerTexture CHECKER_TEXTURE(CheckerTexture(t0, t1));
+static RenderContext context;
+static ConstantTexture t0(Vec3(1.f, 1.f, 0.9f));
+static ConstantTexture t1(Vec3(0.61f, 0.12f, 0.73f));
+static CheckerTexture checker(CheckerTexture(t0, t1));
+static NoiseTexture perlin(context, false, Vec3(1.f, 1.f, 1.f), 4.f);
+static TurbulenceTexture rt1(context, true);
+static TurbulenceTexture rt2(context, true);
+static TurbulenceTexture rt3(context, true);
+static TurbulenceTexture rt4(context, true);
+static SineNoiseTexture latest(context, false, Vec3(1.f, 1.f, 1.f), 2.8f);
+
+static std::vector<Texture*> TextureList;
+static Texture* RandomTexture()
+{
+	int size = static_cast<int>(TextureList.size());
+	if (TextureList.size() == 0)
+	{
+		TextureList.reserve(50);
+		TextureList.push_back(&t0);
+		TextureList.push_back(&t1);
+		TextureList.push_back(&checker);
+		TextureList.push_back(&perlin);
+		TextureList.push_back(&rt1);
+		TextureList.push_back(&rt2);
+		TextureList.push_back(&rt3);
+		TextureList.push_back(&rt4);
+		TextureList.push_back(&latest);
+	}
+
+	return TextureList[int(float(size) * GlobalRandom.rSample())];
+}
 
 
 // C++ 17 parallel
@@ -132,13 +161,12 @@ static Vec3 RenderColor(const Ray& r, const Hitable *world, unsigned int TraceDe
 
 Hitable *random_scene(RenderContext & context) {
 	HitableList *randomHitableList = new HitableList();
-	//randomHitableList->list.reserve(500);
-	//randomHitableList->list.push_back(new Sphere(Vec3(0, -1000.f, 0), 1000.f, new Lambert(Vec3(0.5f, 0.5f, 0.5f), context)));
+
 	static const int numToScatter = 40;
 	std::atomic<int> li = 0;
 	randomHitableList->list.resize(numToScatter * numToScatter * 4 + 4);
 	randomHitableList->list[li++] = new Sphere(Vec3(0, -1000.f, 0), 1000.f, 
-		new Lambert(CHECKER_TEXTURE,
+		new Lambert(latest, //
 			context));
 		
 	std::vector<int> scatters(numToScatter*2);
@@ -151,13 +179,25 @@ Hitable *random_scene(RenderContext & context) {
 			Vec3 center(float(a) + 0.9f*context.rand.rSample(), 0.2f, float(b) + 0.9f*context.rand.rSample());
 			LinearTimeVec3 movableCenter(center, 0.f, center + Vec3(0, 0.5f * context.rand.rSample(), 0), 1.0f);
 			Sphere *newSphere = nullptr;
+
+			bool useTexture = context.rand.rSample() > 0.3f ? true : false;
+
 			//if ((center - Vec3(4.f, 0.2f, 0)).length() > 0.9f) 
 			{
 				if (choose_mat < 0.8f) {  // diffuse
-					newSphere = new Sphere(movableCenter, 0.2f, new Lambert(
-						Vec3(context.rand.rSample()*context.rand.rSample(), 
-						context.rand.rSample()*context.rand.rSample(), 
-						context.rand.rSample()*context.rand.rSample()), context));
+					if (useTexture)
+					{
+						newSphere = new Sphere(movableCenter, 0.2f, new Lambert(
+							*RandomTexture(), context));
+					}
+					else
+					{
+						newSphere = new Sphere(movableCenter, 0.2f, new Lambert(
+							Vec3(context.rand.rSample()*context.rand.rSample(), 
+							context.rand.rSample()*context.rand.rSample(), 
+							context.rand.rSample()*context.rand.rSample()), context));
+					}
+
 				}
 				else if (choose_mat < 0.95f && choose_mat >= 0.8f ) { // metal
 					newSphere = new Sphere(center, 0.2f,
@@ -177,7 +217,7 @@ Hitable *random_scene(RenderContext & context) {
 	);
 
 	randomHitableList->list[li++] = new Sphere(Vec3(0, 1.f, 0), 1.f, new Dielectric(1.5f, context)); 
-	randomHitableList->list[li++] = new Sphere(Vec3(-4.f, 1.f, 0), 1.0f, new Lambert(Vec3(0.4f, 0.2f, 0.1f), context));
+	randomHitableList->list[li++] = new Sphere(Vec3(-4.f, 1.f, 0), 1.0f, new Lambert(rt2, context));
 	randomHitableList->list[li++] = new Sphere(Vec3(4.f, 1.f, 0), 1.0f, new Metal(Vec3(0.7f, 0.6f, 0.5f), 0.0, context));
 
 	Hitable* world = new BVH(randomHitableList->list, 0.f, 1.f, context);
@@ -189,8 +229,8 @@ Hitable *TwoSpheres(RenderContext & context)
 {
 	HitableList *hList = new HitableList();
 	hList->list.resize(2);
-	hList->list[0] = new Sphere(Vec3(0, -10.f, 0), 10.f, new Lambert(CHECKER_TEXTURE, context));
-	hList->list[1] = new Sphere(Vec3(0, 10.f, 0), 10.f, new Lambert(CHECKER_TEXTURE, context));
+	hList->list[0] = new Sphere(Vec3(0, -10.f, 0), 10.f, new Lambert(perlin, context));
+	hList->list[1] = new Sphere(Vec3(0, 10.f, 0), 10.f, new Lambert(checker, context));
 
 	return hList;
 }
@@ -301,15 +341,11 @@ int main(int argc, char** argv)
 	{
 		SAMPLE_PER_PIXEL = std::atoi(getArugmentOption(argc, argv, "-s").c_str());
 	}
-
-	RenderContext context;
+	
+	Perlin::Init(context);
 
 	const float VIEW_WIDTH = 4.0f;
 	const float VIEW_HEIGHT = float(HEIGHT) / float(WIDTH) * VIEW_WIDTH;
-	//Vec3 lookFrom(3.f, 3.f, 2.f);
-	//Vec3 lookAt(0, 0, -1.f);
-	//float distToFocus = (lookFrom - lookAt).length();
-	//float aperture = 0.5f;
 
 	Vec3 lookFrom(13.f, 2.f, 3.f);
 	Vec3 lookAt(0, 0, 0);
@@ -320,7 +356,7 @@ int main(int argc, char** argv)
 		          20.f, float(WIDTH) / float(HEIGHT),
 		          aperture, distToFocus, 0, 1.f, context);
 
-	//TwoSpheres(context);// 
+	// 
 	Hitable* world = random_scene(context);
 	
 

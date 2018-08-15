@@ -28,3 +28,5 @@ private:
 	//std::uniform_real_distribution<float> sampleDist = std::uniform_real_distribution<float>(0.0f, 1.0f);
 	std::uniform_real_distribution<float> diffuseDist = std::uniform_real_distribution<float>(-1.0f, 1.0f);
 };
+
+static Random GlobalRandom;

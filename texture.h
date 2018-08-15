@@ -28,3 +28,35 @@ public:
 	const Texture* even;
 };
 
+struct RenderContext;
+
+class NoiseTexture : public Texture
+{
+public:
+	NoiseTexture(RenderContext &context, bool r = false,
+		const Vec3 &c = Vec3(1.f, 1.f, 1.f),
+		float sc = 1.f);
+	virtual Vec3 value(float u, float v, const Vec3 &p) const override;
+
+protected:
+	bool random;
+	float scale;
+	Vec3 color;
+};
+
+class TurbulenceTexture : public NoiseTexture
+{
+public:
+	TurbulenceTexture(RenderContext &context, bool r = false, const Vec3 &c = Vec3(1.f, 1.f, 1.f), float sc = 1.f) :
+		NoiseTexture(context, r, c, sc) {}
+	virtual Vec3 value(float u, float v, const Vec3 &p) const override;
+};
+
+class SineNoiseTexture : public NoiseTexture
+{
+public:
+	SineNoiseTexture(RenderContext &context, bool r = false, const Vec3 &c = Vec3(1.f, 1.f, 1.f), float sc = 1.f) :
+		NoiseTexture(context, r, c, sc) {}
+	virtual Vec3 value(float u, float v, const Vec3 &p) const override;
+};
+
