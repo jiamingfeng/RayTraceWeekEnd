@@ -1,6 +1,18 @@
 #pragma once
 #include "hitable.h"
 
+#define _USE_MATH_DEFINES
+#include <math.h>
+
+void getSphereUV(const Vec3& p, float& u, float &v)
+{
+	double phi = atan2(p.z(), p.x());
+	double theta = asin(p.y());
+
+	u = float(1.0 - (phi + M_PI) / (2.0 * M_PI));
+	v = float((theta + M_PI_2) / M_PI);
+}
+
 class Sphere :
 	public Hitable
 {
@@ -31,6 +43,7 @@ bool Sphere::IsHitPointValid(float hitPoint, float tMin, float tMax, HitRecord &
 		rec.t = hitPoint;
 		rec.p = r.PointOnRay(hitPoint);
 		rec.normal = (rec.p - centerAtTime(r.Time())) / radius;
+		getSphereUV((rec.p - center) / radius, rec.u, rec.v);
 		rec.mat = mat;
 		return true;
 	}

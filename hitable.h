@@ -15,6 +15,7 @@ struct HitRecord
 	Vec3 p;
 	Vec3 normal;
 	float t;
+	float u, v;
 
 	Material *mat;
 };

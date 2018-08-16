@@ -6,6 +6,9 @@
 #include "Perlin.h"
 #include "renderContext.h"
 
+#define STB_IMAGE_IMPLEMENTATION
+#include "stb_image.h"
+
 
 Vec3 ConstantTexture::value(float u, float v, const Vec3 &p) const
 {
@@ -59,4 +62,30 @@ Vec3 SineNoiseTexture::value(float u, float v, const Vec3 &p) const
 {
 	float perlinNoise = Perlin::turb(scale * p);
 	return color * 0.5f * (1.f + sin(scale * p.z() + 10.f * Perlin::turb(p)));
+}
+
+ImageTexture::ImageTexture(const std::string& imagePath)
+{
+	int numComponents;
+	data = stbi_load(imagePath.c_str(), &width, &height, &numComponents, 0);
+}
+
+ImageTexture::~ImageTexture()
+{
+	STBI_FREE(data);
+}
+
+Vec3 ImageTexture::value(float u, float v, const Vec3 &p) const
+{
+	int i = int(u * width);
+	int j = int((1.f - v) * height);//?
+
+	i = std::clamp(i, 0, width - 1);
+	j = std::clamp(j, 0, height - 1);
+
+	float r = int(data[3 * (width * j + i) + 0]) / 255.0f;
+	float g = int(data[3 * (width * j + i) + 1]) / 255.0f;
+	float b = int(data[3 * (width * j + i) + 2]) / 255.0f;
+
+	return Vec3(r, g, b);
 }

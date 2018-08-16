@@ -47,7 +47,7 @@ bool Lambert::Scatter(const Ray& rIn, const HitRecord& rec, Vec3& attenuation, R
 {
 	Vec3 target = rec.p + rec.normal + RandomSampleInUnitSphere(contextPtr->rand);
 	scattered = Ray(rec.p, target - rec.p, rIn.Time());
-	attenuation = albedoTexture ? albedoTexture->value(0, 0, rec.p) : albedo;
+	attenuation = albedoTexture ? albedoTexture->value(rec.u, rec.v, rec.p) : albedo;
 
 	return true;
 }

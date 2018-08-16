@@ -60,3 +60,18 @@ public:
 	virtual Vec3 value(float u, float v, const Vec3 &p) const override;
 };
 
+class ImageTexture : public Texture
+{
+public:
+	ImageTexture() = default;
+	~ImageTexture();
+	ImageTexture(unsigned char* pixels, int width, int height) :
+		data(pixels), width(width), height(height) {}
+	ImageTexture(const std::string& imagePath);
+
+	virtual Vec3 value(float u, float v, const Vec3 &p) const override;
+
+private:
+	unsigned char* data;
+	int width, height;
+};

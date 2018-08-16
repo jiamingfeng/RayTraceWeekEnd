@@ -25,10 +25,26 @@ using std::chrono::time_point;
 using std::chrono::duration_cast;
 using std::chrono::milliseconds;
 
+// C++ 17 parallel
+#ifdef __clang__
+//#include <experimental/execution>
+// C++ 17 file system
+#include <experimental/filesystem>
+namespace fs = std::experimental::filesystem;
+#else
+#include <execution>
+// C++ 17 file system
+#include <filesystem>
+namespace fs = std::filesystem;
+#endif
+
+
 
 static const bool USE_PNG = true;
 //const bool parallelism_enabled = true;
 static const unsigned int MAX_TRACE_DEPTH = 50;
+
+static const std::string EARTH_FILE_PATH = fs::current_path().string() + "\\earth.jpg";
 
 // constants
 static RenderContext context;
@@ -40,7 +56,10 @@ static TurbulenceTexture rt1(context, true);
 static TurbulenceTexture rt2(context, true);
 static TurbulenceTexture rt3(context, true);
 static TurbulenceTexture rt4(context, true);
-static SineNoiseTexture latest(context, false, Vec3(1.f, 1.f, 1.f), 2.8f);
+static SineNoiseTexture sineNoise(context, false, Vec3(1.f, 1.f, 1.f), 2.8f);
+static ImageTexture earth(EARTH_FILE_PATH);
+
+static ImageTexture& latest = earth;
 
 static std::vector<Texture*> TextureList;
 static Texture* RandomTexture()
@@ -57,25 +76,13 @@ static Texture* RandomTexture()
 		TextureList.push_back(&rt2);
 		TextureList.push_back(&rt3);
 		TextureList.push_back(&rt4);
+		TextureList.push_back(&sineNoise);
+		TextureList.push_back(&earth);
 		TextureList.push_back(&latest);
 	}
 
 	return TextureList[int(float(size) * GlobalRandom.rSample())];
 }
-
-
-// C++ 17 parallel
-#ifdef __clang__
-//#include <experimental/execution>
-// C++ 17 file system
-#include <experimental/filesystem>
-namespace fs = std::experimental::filesystem;
-#else
-#include <execution>
-// C++ 17 file system
-#include <filesystem>
-namespace fs = std::filesystem;
-#endif
 
 
 void PPM_HEADER(int width, int height)
@@ -147,7 +154,7 @@ static Vec3 RenderColor(const Ray& r, const Hitable *world, unsigned int TraceDe
 		Vec3 attenuation;
 		if (TraceDepth < MAX_TRACE_DEPTH && recHit.mat->Scatter(r, recHit, attenuation, scatted))
 		{
-			result = attenuation * RenderColor(scatted, world, TraceDepth+1);
+			result = attenuation *RenderColor(scatted, world, TraceDepth + 1);
 		}		
 	}
 	else
@@ -217,8 +224,8 @@ Hitable *random_scene(RenderContext & context) {
 	);
 
 	randomHitableList->list[li++] = new Sphere(Vec3(0, 1.f, 0), 1.f, new Dielectric(1.5f, context)); 
-	randomHitableList->list[li++] = new Sphere(Vec3(-4.f, 1.f, 0), 1.0f, new Lambert(rt2, context));
-	randomHitableList->list[li++] = new Sphere(Vec3(4.f, 1.f, 0), 1.0f, new Metal(Vec3(0.7f, 0.6f, 0.5f), 0.0, context));
+	randomHitableList->list[li++] = new Sphere(Vec3(-4.f, 1.f, 0), 1.0f, new Metal(Vec3(0.7f, 0.6f, 0.5f), 0.0, context));
+	randomHitableList->list[li++] = new Sphere(Vec3(4.f, 1.f, 0), 1.0f, new Lambert(earth, context));
 
 	Hitable* world = new BVH(randomHitableList->list, 0.f, 1.f, context);
 
