@@ -5,10 +5,12 @@
 // geometries
 #include "material.h"
 #include "sphere.h"
+#include "aarec.h"
 #include "camera.h"
 #include "renderContext.h"
 #include "bvh.h"
 #include "perlin.h"
+#include "box.h"
 
 //std cout
 #include <iostream>
@@ -50,7 +52,14 @@ static const std::string EARTH_FILE_PATH = fs::current_path().string() + "\\eart
 static RenderContext context;
 static ConstantTexture t0(Vec3(1.f, 1.f, 0.9f));
 static ConstantTexture t1(Vec3(0.61f, 0.12f, 0.73f));
+static ConstantTexture bright(Vec3(3.f, 3.f, 3.f));
 static CheckerTexture checker(CheckerTexture(t0, t1));
+static ConstantTexture red(Vec3(0.65f, 0.05f, 0.05f));
+static ConstantTexture white(Vec3(0.73f, 0.73f, 0.73f));
+static ConstantTexture pureWhite(Vec3(1.f, 1.f, 1.f));
+static ConstantTexture pureBlack(Vec3(0.f, 0.f, 0.f));
+static ConstantTexture green(Vec3(0.12f, 0.45f, 0.15f));
+static ConstantTexture light(Vec3(15.f, 15.f, 15.f));
 static NoiseTexture perlin(context, false, Vec3(1.f, 1.f, 1.f), 4.f);
 static TurbulenceTexture rt1(context, true);
 static TurbulenceTexture rt2(context, true);
@@ -70,6 +79,7 @@ static Texture* RandomTexture()
 		TextureList.reserve(50);
 		TextureList.push_back(&t0);
 		TextureList.push_back(&t1);
+		TextureList.push_back(&bright);
 		TextureList.push_back(&checker);
 		TextureList.push_back(&perlin);
 		TextureList.push_back(&rt1);
@@ -152,18 +162,24 @@ static Vec3 RenderColor(const Ray& r, const Hitable *world, unsigned int TraceDe
 	{
 		Ray scatted;
 		Vec3 attenuation;
+		Vec3 emitted = recHit.mat->Emitted(recHit.u, recHit.v, recHit.p);
 		if (TraceDepth < MAX_TRACE_DEPTH && recHit.mat->Scatter(r, recHit, attenuation, scatted))
 		{
-			result = attenuation *RenderColor(scatted, world, TraceDepth + 1);
-		}		
+			result = emitted + attenuation * RenderColor(scatted, world, TraceDepth + 1);
+		}
+		else
+		{
+			return emitted;
+		}
 	}
 	else
 	{
-		float t = 0.5f * (unit_vector(r.Direction()).y() + 1.0f);
-		result = (1.0f - t) * Vec3(1.0f, 1.0f, 1.0f) + t * Vec3(0.5f, 0.7f, 1.0f);  // 0~ 1
+		//float t = 0.5f * (unit_vector(r.Direction()).y() + 1.0f);
+		//result = (1.0f - t) * Vec3(1.0f, 1.0f, 1.0f) + t * Vec3(0.5f, 0.7f, 1.0f);  // 0~ 1
+		result = Vec3(0, 0, 0);
 	}
 
-	return result;// * 255.f;  // 0 ~ 255
+	return result;
 }
 
 Hitable *random_scene(RenderContext & context) {
@@ -227,9 +243,21 @@ Hitable *random_scene(RenderContext & context) {
 	randomHitableList->list[li++] = new Sphere(Vec3(-4.f, 1.f, 0), 1.0f, new Metal(Vec3(0.7f, 0.6f, 0.5f), 0.0, context));
 	randomHitableList->list[li++] = new Sphere(Vec3(4.f, 1.f, 0), 1.0f, new Lambert(earth, context));
 
+	randomHitableList->list[li++] = new XYRect(3.f, 5.f, 1.f, 3.f, -2.f, new DiffuseLight(bright, context));
+
 	Hitable* world = new BVH(randomHitableList->list, 0.f, 1.f, context);
 
 	return world;
+}
+
+Hitable *simple_light() {
+	HitableList *scene = new HitableList();
+	scene->list.resize(4);
+	scene->list[0] = new Sphere(Vec3(0, -1000.f, 0), 1000.f, new Lambert(rt2, context));
+	scene->list[1] = new Sphere(Vec3(2.f, 2.f, 0.5f), 2.f, new Lambert(rt3, context));
+	scene->list[2] = new Sphere(Vec3(0, 7.f, 0), 2.f, new DiffuseLight(bright, context, 0.5f));
+	scene->list[3] = new XYRect(3.f, 5.f, 1.f, 3.f, -2.f, new DiffuseLight(checker, context, 4.f));
+	return scene;
 }
 
 Hitable *TwoSpheres(RenderContext & context)
@@ -240,6 +268,46 @@ Hitable *TwoSpheres(RenderContext & context)
 	hList->list[1] = new Sphere(Vec3(0, 10.f, 0), 10.f, new Lambert(checker, context));
 
 	return hList;
+}
+
+Hitable *cornell_box() {
+	HitableList *scene = new HitableList();
+	scene->list.resize(8);
+	int i = 0;
+	Material *redM = new Lambert(red, context);
+	Material *whiteM = new Lambert(white, context);
+	Material *greenM = new Lambert(green, context);
+	Material *lightM = new DiffuseLight(light, context);
+	scene->list[i++] = new FlipNormals(new YZRect(0, 555, 0, 555, 555, greenM));
+	scene->list[i++] = new YZRect(0, 555, 0, 555, 0, redM);
+	scene->list[i++] = new XZRect(213, 343, 227, 332, 554, lightM);
+	scene->list[i++] = new FlipNormals(new XZRect(0, 555, 0, 555, 555, whiteM));
+	scene->list[i++] = new XZRect(0, 555, 0, 555, 0, whiteM);
+	scene->list[i++] = new FlipNormals(new XYRect(0, 555, 0, 555, 555, whiteM));
+	scene->list[i++] = new Translate(new rotate_y(new Box(Vec3(0, 0, 0), Vec3(165, 165, 165), whiteM), -18), Vec3(130, 0, 65));
+	scene->list[i++] = new Translate(new rotate_y(new Box(Vec3(0, 0, 0), Vec3(165, 330, 165), whiteM), 15), Vec3(265, 0, 295));
+	return scene;
+}
+
+Hitable *cornell_box_smoke() {
+	HitableList *scene = new HitableList();
+	scene->list.resize(8);
+	int i = 0;
+	Material *redM = new Lambert(red, context);
+	Material *whiteM = new Lambert(white, context);
+	Material *greenM = new Lambert(green, context);
+	Material *lightM = new DiffuseLight(light, context, 0.5f);
+	scene->list[i++] = new FlipNormals(new YZRect(0, 555, 0, 555, 555, greenM));
+	scene->list[i++] = new YZRect(0, 555, 0, 555, 0, redM);
+	scene->list[i++] = new XZRect(113, 443, 127, 432, 554, lightM);
+	scene->list[i++] = new FlipNormals(new XZRect(0, 555, 0, 555, 555, whiteM));
+	scene->list[i++] = new XZRect(0, 555, 0, 555, 0, whiteM);
+	scene->list[i++] = new FlipNormals(new XYRect(0, 555, 0, 555, 555, whiteM));
+	Hitable* fog = new Translate(new rotate_y(new Box(Vec3(0, 0, 0), Vec3(165, 165, 165), whiteM), -18), Vec3(130, 0, 65));
+	Hitable* smoke = new Translate(new rotate_y(new Box(Vec3(0, 0, 0), Vec3(165, 330, 165), whiteM), 15), Vec3(265, 0, 295));
+	scene->list[i++] = new ConstantMedium(fog, 0.01f, pureWhite, context);
+	scene->list[i++] = new ConstantMedium(smoke, 0.01f, pureBlack, context);
+	return scene;
 }
 
 unsigned char* Render(int width, int height, int spp, Hitable* world, Camera &camera, RenderContext & context )
@@ -354,17 +422,18 @@ int main(int argc, char** argv)
 	const float VIEW_WIDTH = 4.0f;
 	const float VIEW_HEIGHT = float(HEIGHT) / float(WIDTH) * VIEW_WIDTH;
 
-	Vec3 lookFrom(13.f, 2.f, 3.f);
-	Vec3 lookAt(0, 0, 0);
+	Vec3 lookFrom(278, 278, -800);// (13.f, 2.f, 3.f);
+	Vec3 lookAt(278, 278, 0);//(0, 0, 0);
 	float distToFocus = 10.0f;
 	float aperture = 0.1f;
+	float fov = 40.f;
 
 	Camera camera(lookFrom, lookAt, Vec3(0, 1.f, 0),
-		          20.f, float(WIDTH) / float(HEIGHT),
+		          45.f, float(WIDTH) / float(HEIGHT),
 		          aperture, distToFocus, 0, 1.f, context);
 
 	// 
-	Hitable* world = random_scene(context);
+	Hitable* world = cornell_box_smoke();// cornell_box();//simple_light();//random_scene(context);
 	
 
 	unsigned char* imageBuffer = Render(WIDTH, HEIGHT, SAMPLE_PER_PIXEL, world, camera, context);

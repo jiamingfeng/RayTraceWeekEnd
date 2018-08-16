@@ -13,7 +13,7 @@ class Material
 public:
 	Material( RenderContext& context) : contextPtr(&context) {}
 	virtual bool Scatter(const Ray& rIn, const HitRecord& rec, Vec3& attenuation, Ray& scattered) const = 0;
-
+	virtual Vec3 Emitted(float u, float v, const Vec3 &p) const { return Vec3(0, 0, 0); }
 protected:
 	RenderContext* contextPtr;
 };
@@ -57,6 +57,26 @@ public:
 	virtual bool Scatter(const Ray& rIn, const HitRecord& rec, Vec3& attenuation, Ray& scattered) const override;
 
 	float reflectIndex;
+};
+
+class DiffuseLight : public Material
+{
+public:
+	DiffuseLight(const Texture& t, RenderContext& context, float i = 1.f) : emit(&t), intensity(i), Material(context) {}
+	virtual bool Scatter(const Ray& rIn, const HitRecord& rec, Vec3& attenuation, Ray& scattered) const override { return false; }
+	virtual Vec3 Emitted(float u, float v, const Vec3 &p) const { return emit->value(u, v, p) * intensity; }
+private:
+	const Texture* emit;
+	float intensity;
+};
+
+class ISOTropic : public Material
+{
+public:
+	ISOTropic(const Texture &t, RenderContext& context) : albedo(&t), Material(context) {}
+	virtual bool Scatter(const Ray& rIn, const HitRecord& rec, Vec3& attenuation, Ray& scattered) const override;
+private:
+	const Texture *albedo;
 };
 
 
